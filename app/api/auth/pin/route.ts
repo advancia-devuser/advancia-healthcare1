@@ -1,0 +1,188 @@
+/**
+ * PIN Setup & Verify API
+ * ──────────────────────
+ * POST /api/auth/pin
+ * Actions: setup | verify | change
+ *
+ * PIN is a 6-digit code hashed with scrypt before storage.
+ * Required for sensitive operations (transfers, withdrawals).
+ */
+
+import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { requireApprovedUser, checkRateLimit, getClientIP } from "@/lib/auth";
+import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
+
+const SALT_LENGTH = 16;
+
+function hashPin(pin: string): string {
+  const salt = randomBytes(SALT_LENGTH).toString("hex");
+  const hash = scryptSync(pin, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function verifyPin(pin: string, stored: string): boolean {
+  const [salt, hash] = stored.split(":");
+  if (!salt || !hash) return false;
+  const derived = scryptSync(pin, salt, 64);
+  return timingSafeEqual(derived, Buffer.from(hash, "hex"));
+}
+
+export async function POST(request: Request) {
+  try {
+    const user = await requireApprovedUser(request);
+    const body = await request.json();
+    const { action, pin, currentPin, newPin } = body;
+
+    // Rate limit PIN attempts (5 per minute)
+    const ip = getClientIP(request);
+    if (!checkRateLimit(`pin:${user.id}:${ip}`, 5, 60_000)) {
+      return NextResponse.json(
+        { error: "Too many attempts. Try again in a minute." },
+        { status: 429 }
+      );
+    }
+
+    if (!action) {
+      return NextResponse.json(
+        { error: "action is required (setup | verify | change)" },
+        { status: 400 }
+      );
+    }
+
+    /* ─── SETUP: Set initial PIN ─── */
+    if (action === "setup") {
+      if (user.pin) {
+        return NextResponse.json(
+          { error: "PIN is already set. Use 'change' to update it." },
+          { status: 400 }
+        );
+      }
+
+      if (!pin || typeof pin !== "string" || !/^\d{6}$/.test(pin)) {
+        return NextResponse.json(
+          { error: "PIN must be exactly 6 digits" },
+          { status: 400 }
+        );
+      }
+
+      const hashed = hashPin(pin);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { pin: hashed },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          actor: user.address,
+          action: "PIN_SET",
+        },
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId: user.id,
+          title: "Transaction PIN Set",
+          body: "Your 6-digit transaction PIN has been set successfully.",
+          channel: "IN_APP",
+        },
+      });
+
+      return NextResponse.json({ set: true, message: "PIN has been set." });
+    }
+
+    /* ─── VERIFY: Check a PIN ─── */
+    if (action === "verify") {
+      if (!user.pin) {
+        return NextResponse.json(
+          { error: "No PIN set. Call setup first." },
+          { status: 400 }
+        );
+      }
+
+      if (!pin || typeof pin !== "string") {
+        return NextResponse.json(
+          { error: "pin is required" },
+          { status: 400 }
+        );
+      }
+
+      const valid = verifyPin(pin, user.pin);
+
+      if (!valid) {
+        await prisma.auditLog.create({
+          data: {
+            userId: user.id,
+            actor: user.address,
+            action: "PIN_VERIFY_FAILED",
+            meta: JSON.stringify({ ip }),
+          },
+        });
+        return NextResponse.json(
+          { valid: false, error: "Incorrect PIN" },
+          { status: 401 }
+        );
+      }
+
+      return NextResponse.json({ valid: true });
+    }
+
+    /* ─── CHANGE: Update PIN ─── */
+    if (action === "change") {
+      if (!user.pin) {
+        return NextResponse.json(
+          { error: "No PIN set. Use setup first." },
+          { status: 400 }
+        );
+      }
+
+      if (!currentPin || !newPin) {
+        return NextResponse.json(
+          { error: "currentPin and newPin are required" },
+          { status: 400 }
+        );
+      }
+
+      if (typeof newPin !== "string" || !/^\d{6}$/.test(newPin)) {
+        return NextResponse.json(
+          { error: "New PIN must be exactly 6 digits" },
+          { status: 400 }
+        );
+      }
+
+      const valid = verifyPin(currentPin, user.pin);
+      if (!valid) {
+        return NextResponse.json(
+          { error: "Current PIN is incorrect" },
+          { status: 401 }
+        );
+      }
+
+      const hashed = hashPin(newPin);
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { pin: hashed },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          userId: user.id,
+          actor: user.address,
+          action: "PIN_CHANGED",
+        },
+      });
+
+      return NextResponse.json({ changed: true, message: "PIN has been changed." });
+    }
+
+    return NextResponse.json(
+      { error: "Invalid action. Use setup, verify, or change." },
+      { status: 400 }
+    );
+  } catch (e) {
+    if (e instanceof Response) return e;
+    console.error("PIN error:", e);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+  }
+}

@@ -1,0 +1,49 @@
+@baseUrl = http://localhost:3000/api
+
+### 1. Health Check
+GET {{baseUrl}}/health
+
+### 2. Register a new user (Mocking the Account Kit login)
+# Note: In a real scenario, this is handled by the frontend using Account Kit
+POST {{baseUrl}}/auth/session
+Content-Type: application/json
+
+{
+  "address": "0x1234567890123456789012345678901234567890"
+}
+
+### 3. Get User Profile (Requires the user_session cookie from the previous request)
+GET {{baseUrl}}/auth/me
+
+### 4. Request a Withdrawal
+# Replace the cookie value with the actual user_session cookie you get from the browser or the session endpoint
+POST {{baseUrl}}/withdrawals
+Content-Type: application/json
+Cookie: user_session=YOUR_JWT_TOKEN_HERE
+
+{
+  "amount": "0.5",
+  "asset": "ETH",
+  "toAddress": "0xRecipientAddressHere...",
+  "chainId": 1,
+  "pin": "123456"
+}
+
+### 5. Get User's Withdrawal History
+GET {{baseUrl}}/withdrawals?page=1&limit=10
+Cookie: user_session=YOUR_JWT_TOKEN_HERE
+
+### 6. Admin: Get All Pending Withdrawals
+# Requires admin_session cookie
+GET {{baseUrl}}/admin/withdrawals?status=PENDING
+Cookie: admin_session=YOUR_ADMIN_JWT_TOKEN_HERE
+
+### 7. Admin: Approve a Withdrawal
+PATCH {{baseUrl}}/admin/withdrawals
+Content-Type: application/json
+Cookie: admin_session=YOUR_ADMIN_JWT_TOKEN_HERE
+
+{
+  "withdrawalId": "REPLACE_WITH_WITHDRAWAL_ID",
+  "action": "APPROVE"
+}

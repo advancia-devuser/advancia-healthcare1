@@ -1,0 +1,56 @@
+# ═══════════════════════════════════════════════════════════════
+#  SmartWallet — Docker Compose (multi-instance + Nginx LB)
+# ═══════════════════════════════════════════════════════════════
+#
+#  Start:   docker compose up -d --scale app=3
+#  Check:   docker compose ps
+#  Logs:    docker compose logs -f app
+#  Stop:    docker compose down
+# ═══════════════════════════════════════════════════════════════
+
+version: "3.9"
+
+services:
+  # ── Nginx Load Balancer ──
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infra/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./infra/certs:/etc/letsencrypt:ro           # Mount SSL certs
+      - ./infra/certbot-www:/var/www/certbot:ro      # ACME challenges
+    depends_on:
+      - app
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Next.js Application (scale with --scale app=N) ──
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:./prisma/dev.db
+      - ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET:?Set ADMIN_JWT_SECRET env var}
+      - USER_JWT_SECRET=${USER_JWT_SECRET:?Set USER_JWT_SECRET env var}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Set ADMIN_PASSWORD env var}
+      - HEALTH_ENCRYPTION_KEY=${HEALTH_ENCRYPTION_KEY:-}
+      - NEXT_PUBLIC_ALCHEMY_API_KEY=${NEXT_PUBLIC_ALCHEMY_API_KEY:-}
+      - NEXT_PUBLIC_ALCHEMY_POLICY_ID=${NEXT_PUBLIC_ALCHEMY_POLICY_ID:-}
+      - NEXT_PUBLIC_CHAIN_ID=${NEXT_PUBLIC_CHAIN_ID:-421614}
+    expose:
+      - "3000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s

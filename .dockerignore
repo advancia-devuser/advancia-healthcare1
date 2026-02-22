@@ -1,0 +1,9 @@
+node_modules
+.next
+.git
+*.md
+.env
+.env.local
+infra/certs
+infra/certbot-www
+prisma/dev.db

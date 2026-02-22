@@ -1,0 +1,53 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/cron/deposits",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/withdrawals",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/notifications",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/health-reminders",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/reconcile",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/subscriptions",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/bills",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/installments",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/cards",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/convert",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/health-transactions",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/health-expiry",
+      "schedule": "0 2 * * *"
+    }
+  ]
+}
