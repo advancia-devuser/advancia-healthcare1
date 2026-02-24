@@ -150,9 +150,10 @@ async function processWebhook(provider: "TRANSAK" | "MOONPAY" | "RAMP", data: We
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { provider: string } }
+  { params }: { params: Promise<{ provider: string }> }
 ) {
-  const providerKey = params.provider?.toUpperCase();
+  const { provider } = await params;
+  const providerKey = provider?.toUpperCase();
   const rawBody = await req.text();
 
   // ─── Transak Webhook ───

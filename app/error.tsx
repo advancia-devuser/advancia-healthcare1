@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { AlertTriangle, RefreshCw, Home } from "lucide-react";
+import Link from "next/link";
 
 /**
  * Global Error Boundary — catches unhandled errors in the app tree.
@@ -56,13 +57,13 @@ export default function GlobalError({
               <RefreshCw className="w-4 h-4" />
               Try Again
             </button>
-            <a
+            <Link
               href="/"
               className="flex items-center justify-center gap-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 px-5 rounded-xl transition-colors"
             >
               <Home className="w-4 h-4" />
               Home
-            </a>
+            </Link>
           </div>
 
           <p className="text-center text-xs text-gray-400 pt-2">

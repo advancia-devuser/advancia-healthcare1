@@ -11,7 +11,9 @@ function assertDatabaseUrlIsSsl(url: string | undefined) {
     const host = u.hostname;
     const isLocalHost = host === "localhost" || host === "127.0.0.1";
     const sslmode = u.searchParams.get("sslmode")?.toLowerCase();
-    if (process.env.NODE_ENV !== "production" && isLocalHost) {
+    // Always allow localhost connections without SSL. This keeps local Docker/Postgres
+    // usable even when `next build` sets NODE_ENV=production.
+    if (isLocalHost) {
       if (!sslmode || sslmode === "disable") return;
     }
   } catch {

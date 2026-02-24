@@ -8,6 +8,7 @@ import { Providers } from "./providers";
 import CookieBanner from "./components/cookie-banner";
 import LiveChat from "./components/live-chat";
 import { ToastProvider } from "./components/toast-provider";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,16 +23,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   // Persist state across pages
   // https://www.alchemy.com/docs/wallets/react/ssr#persisting-the-account-state
+  const cookieHeader = (await headers()).get("cookie") ?? undefined;
   const initialState = cookieToInitialState(
     config,
-    headers().get("cookie") ?? undefined
+    cookieHeader
   );
 
   return (
@@ -42,6 +44,7 @@ export default function RootLayout({
             {children}
             <CookieBanner />
             <LiveChat />
+            <SpeedInsights />
           </ToastProvider>
         </Providers>
       </body>
