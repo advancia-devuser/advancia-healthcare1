@@ -9,6 +9,7 @@ import CookieBanner from "./components/cookie-banner";
 import LiveChat from "./components/live-chat";
 import { ToastProvider } from "./components/toast-provider";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -45,6 +46,7 @@ export default async function RootLayout({
             <CookieBanner />
             <LiveChat />
             <SpeedInsights />
+            <Analytics />
           </ToastProvider>
         </Providers>
       </body>
