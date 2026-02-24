@@ -10,13 +10,21 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireApprovedUser, checkRateLimit, getClientIP } from "@/lib/auth";
+import { getAuthUser, checkRateLimit, getClientIP } from "@/lib/auth";
 import { randomBytes } from "crypto";
 import { sendVerificationEmail } from "@/lib/email";
 
+function normalizeCode(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.trim().toUpperCase();
+}
+
 export async function POST(request: Request) {
   try {
-    const user = await requireApprovedUser(request);
+    const user = await getAuthUser(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
     const body = await request.json();
     const { action, token } = body;
 
@@ -53,23 +61,23 @@ export async function POST(request: Request) {
         );
       }
 
-      const verificationToken = randomBytes(32).toString("hex");
+      // 8-char uppercase hex code (32-bit). Rate-limited to reduce brute-force risk.
+      const verificationCode = randomBytes(4).toString("hex").toUpperCase();
       const expiry = new Date(Date.now() + 24 * 60 * 60_000); // 24 hours
 
       await prisma.user.update({
         where: { id: user.id },
         data: {
-          emailVerificationToken: verificationToken,
+          emailVerificationToken: verificationCode,
           emailVerificationExpiry: expiry,
         },
       });
 
       // In production, send this token via email (Resend, SendGrid, etc.)
       // For now, log it and return a masked response
-      console.log(`[EMAIL VERIFICATION] User ${user.id}: Token = ${verificationToken}`);
+      console.log(`[EMAIL VERIFICATION] User ${user.id}: Code = ${verificationCode}`);
 
       // Send the verification email
-      const verificationCode = verificationToken.slice(0, 8).toUpperCase();
       await sendVerificationEmail(user.email, verificationCode);
 
       await prisma.auditLog.create({
@@ -85,7 +93,7 @@ export async function POST(request: Request) {
         sent: true,
         message: `Verification email sent to ${user.email.replace(/(.{2})(.*)(@.*)/, "$1***$3")}`,
         // Include token in dev mode for testing
-        ...(process.env.NODE_ENV === "development" ? { devToken: verificationToken } : {}),
+        ...(process.env.NODE_ENV === "development" ? { devToken: verificationCode } : {}),
       });
     }
 
@@ -102,14 +110,17 @@ export async function POST(request: Request) {
         return NextResponse.json({ verified: true, message: "Email already verified." });
       }
 
-      if (!token || typeof token !== "string") {
+      const providedCode = normalizeCode(token);
+      if (!providedCode) {
         return NextResponse.json(
           { error: "token is required" },
           { status: 400 }
         );
       }
 
-      if (!user.emailVerificationToken) {
+      const expectedCode = normalizeCode(user.emailVerificationToken);
+
+      if (!expectedCode) {
         return NextResponse.json(
           { error: "No verification pending. Request a new code." },
           { status: 400 }
@@ -126,7 +137,7 @@ export async function POST(request: Request) {
         );
       }
 
-      if (user.emailVerificationToken !== token) {
+      if (expectedCode !== providedCode) {
         await prisma.auditLog.create({
           data: {
             userId: user.id,
@@ -136,7 +147,7 @@ export async function POST(request: Request) {
           },
         });
         return NextResponse.json(
-          { error: "Invalid verification token" },
+          { error: "Invalid verification code" },
           { status: 400 }
         );
       }
@@ -148,6 +159,7 @@ export async function POST(request: Request) {
           emailVerified: true,
           emailVerificationToken: null,
           emailVerificationExpiry: null,
+          ...(user.status === "PENDING" ? { status: "APPROVED" } : {}),
         },
       });
 

@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     }
 
     // Check if email already exists
-    const existing = await prisma.user.findFirst({ where: { email: email.toLowerCase() } });
+    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (existing) {
       return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 });
     }

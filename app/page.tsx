@@ -1,6 +1,5 @@
 "use client";
 
-import { useSignerStatus } from "@account-kit/react";
 import LoginCard from "./components/login-card";
 import Header from "./components/header";
 import Link from "next/link";
@@ -13,16 +12,17 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useAuth } from "./hooks/useAuth";
 
 export default function Home() {
-  const signerStatus = useSignerStatus();
+  const { isLoggedIn, isLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (signerStatus.isConnected) {
+    if (isLoggedIn) {
       router.push("/dashboard");
     }
-  }, [signerStatus.isConnected, router]);
+  }, [isLoggedIn, router]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/30">
@@ -50,7 +50,7 @@ export default function Home() {
             Your secure healthcare wallet and management platform. Manage your health cards, medical bills, and wellness reminders in one place.
           </p>
           <div className="flex justify-center gap-4 pt-8 min-h-[100px]">
-            {signerStatus.isInitializing || signerStatus.isAuthenticating || signerStatus.isConnected ? (
+            {isLoading || isLoggedIn ? (
               <div className="flex flex-col items-center justify-center space-y-4">
                 <Loader2 className="w-10 h-10 animate-spin text-primary" />
                 <p className="text-muted-foreground">Loading your secure wallet...</p>

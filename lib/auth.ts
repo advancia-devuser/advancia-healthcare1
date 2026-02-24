@@ -4,7 +4,10 @@ import { prisma } from "@/lib/db";
 
 const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET;
 if (!ADMIN_JWT_SECRET && typeof window === "undefined") {
-  console.warn("⚠️ ADMIN_JWT_SECRET not set — admin auth will fail in production");
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("ADMIN_JWT_SECRET is required in production");
+  }
+  console.warn("⚠️ ADMIN_JWT_SECRET not set — using dev-only fallback secret");
 }
 const ADMIN_SECRET = new TextEncoder().encode(
   ADMIN_JWT_SECRET || "dev-only-admin-secret-never-use-in-prod"
@@ -12,7 +15,10 @@ const ADMIN_SECRET = new TextEncoder().encode(
 
 const USER_JWT_SECRET = process.env.USER_JWT_SECRET;
 if (!USER_JWT_SECRET && typeof window === "undefined") {
-  console.warn("⚠️ USER_JWT_SECRET not set — user auth will fail in production");
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("USER_JWT_SECRET is required in production");
+  }
+  console.warn("⚠️ USER_JWT_SECRET not set — using dev-only fallback secret");
 }
 const USER_SECRET = new TextEncoder().encode(
   USER_JWT_SECRET || "dev-only-user-secret-never-use-in-prod"

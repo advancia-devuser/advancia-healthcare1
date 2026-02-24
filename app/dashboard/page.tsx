@@ -1,6 +1,5 @@
 "use client";
 
-import { useSignerStatus, useUser, useSmartAccountClient } from "@account-kit/react";
 import Header from "../components/header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,6 +16,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useToast } from "@/app/components/toast-provider";
 import { QRCodeCanvas } from "qrcode.react";
 import { Copy } from "lucide-react";
+import { useAuth } from "@/app/hooks/useAuth";
 
 import OverviewTab from "./tabs/OverviewTab";
 import TransfersTab from "./tabs/TransfersTab";
@@ -53,11 +53,9 @@ function shortAddr(a: string): string {
 type Tab = "overview" | "transfers" | "bills" | "budgets" | "cards" | "health" | "settings";
 
 export default function Dashboard() {
-  const signerStatus = useSignerStatus();
-  const user = useUser();
+  const { isLoggedIn, isLoading: authLoading, user: authUser } = useAuth();
   const router = useRouter();
   const toast = useToast();
-  const { client } = useSmartAccountClient({});
 
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -119,12 +117,12 @@ export default function Dashboard() {
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
-    if (!signerStatus.isConnected && !signerStatus.isInitializing) {
+    if (!authLoading && !isLoggedIn) {
       router.push("/");
     }
-  }, [signerStatus.isConnected, signerStatus.isInitializing, router]);
+  }, [isLoggedIn, authLoading, router]);
 
-  const addr = user?.address || "";
+  const addr = authUser?.address || "";
   const h = useCallback(() => headers(addr), [addr]);
 
   // Fetch all data
@@ -511,7 +509,7 @@ export default function Dashboard() {
     } catch (e: any) { setActionMsg(e.message); toast.error("Subscription failed", e.message); } finally { setActionLoading(false); }
   }
 
-  if (!signerStatus.isConnected) return null;
+  if (authLoading || !isLoggedIn) return null;
 
   if (loading) {
     return (
@@ -1108,7 +1106,7 @@ export default function Dashboard() {
             addr={addr}
             handleSaveProfile={handleSaveProfile}
             actionLoading={actionLoading}
-            client={client}
+            client={null}
             toast={toast}
           />
         )}

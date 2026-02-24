@@ -12,13 +12,20 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { useAuthModal, useSignerStatus } from "@account-kit/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import { useAlchemyAvailable } from "@/app/providers";
+
+/* Dynamically import the wallet button so @account-kit/react hooks
+   are never evaluated unless the component actually renders. */
+const WalletLoginButton = dynamic(
+  () => import("./wallet-login-button"),
+  { ssr: false, loading: () => null }
+);
 
 export default function LoginPage() {
-  const { openAuthModal } = useAuthModal();
-  const { isAuthenticating } = useSignerStatus();
+  const alchemyAvailable = useAlchemyAvailable();
   const router = useRouter();
 
   // Tab state: "login" | "register"
@@ -89,7 +96,7 @@ export default function LoginPage() {
       return;
     }
     setPrivacyError(false);
-    openAuthModal();
+    // WalletLoginButton handles modal opening internally
   };
 
   return (
@@ -217,33 +224,22 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        {/* Divider */}
-        <div className="relative">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-gray-200 dark:border-gray-700" />
-          </div>
-          <div className="relative flex justify-center text-xs">
-            <span className="bg-white dark:bg-gray-900 px-3 text-gray-400">or</span>
-          </div>
-        </div>
+        {/* Wallet Login (Alchemy) – only shown when Alchemy is working */}
+        {alchemyAvailable && (
+          <>
+            {/* Divider */}
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200 dark:border-gray-700" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-white dark:bg-gray-900 px-3 text-gray-400">or</span>
+              </div>
+            </div>
 
-        {/* Wallet Login (Alchemy) */}
-        <Button
-          variant="outline"
-          size="lg"
-          onClick={handleWalletLogin}
-          disabled={isAuthenticating}
-          className="w-full h-11 text-sm font-medium rounded-xl border-gray-200 hover:bg-gray-50 dark:border-gray-700"
-        >
-          {isAuthenticating ? (
-            <><Loader2 className="animate-spin mr-2 h-4 w-4" /> Connecting Wallet...</>
-          ) : (
-            <>
-              <ShieldCheck className="w-4 h-4 mr-2 text-blue-500" />
-              Sign In with Wallet / Google / Passkey
-            </>
-          )}
-        </Button>
+            <WalletLoginButton disabled={!privacyAccepted} />
+          </>
+        )}
 
         {/* Privacy acceptance */}
         <div className="space-y-1">

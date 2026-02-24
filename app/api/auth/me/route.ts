@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 
 /**
  * GET /api/auth/me
- * Returns the current user + wallet info based on x-wallet-address header.
+ * Returns the current user + wallet info based on the authenticated JWT session.
  */
 export async function GET(request: Request) {
   try {
