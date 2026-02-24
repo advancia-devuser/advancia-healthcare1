@@ -24,7 +24,6 @@ const uiConfig = {
       [
         { type: "passkey" },
         { type: "social", authProviderId: "google", mode: "popup" },
-        { type: "social", authProviderId: "facebook", mode: "popup" },
       ],
     ],
     addPasskeyOnSignup: false,

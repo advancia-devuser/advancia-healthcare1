@@ -7,6 +7,554 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model User {
+  id                      String               @id @default(uuid())
+  address                 String               @unique
+  email                   String?              @unique
+  emailVerified           Boolean              @default(false)
+  emailVerificationToken  String?
+  emailVerificationExpiry DateTime?
+  name                    String?
+  phone                   String?
+  avatarUrl               String?
+  pin                     String?
+  twoFaSecret             String?
+  twoFaEnabled            Boolean              @default(false)
+  role                    UserRole             @default(USER)
+  status                  UserStatus           @default(PENDING)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
+  password                String?
+  auditLogs               AuditLog[]
+  bankAccounts            BankAccount[]
+  billPayments            BillPayment[]
+  bookings                Booking[]
+  budgets                 Budget[]
+  cardRequests            CardRequest[]
+  contacts                Contact[]
+  conversions             Conversion[]
+  cryptoOrders            CryptoOrder[]
+  devices                 Device[]
+  giftCards               GiftCard[]
+  healthCards             HealthCard[]
+  healthReminders         HealthReminder[]
+  healthTransactions      HealthTransaction[]
+  installments            Installment[]
+  loyaltyCards            LoyaltyCard[]
+  notifications           Notification[]
+  paymentRequests         PaymentRequest[]
+  subscriptions           Subscription[]
+  transactions            Transaction[]
+  wallet                  Wallet?
+  walletBalances          WalletBalance[]
+  webauthnCredentials     WebAuthnCredential[]
+  withdrawals             Withdrawal[]
+
+  @@index([status])
+  @@index([role])
+}
+
+model Wallet {
+  id                  String   @id @default(uuid())
+  userId              String   @unique
+  smartAccountAddress String
+  chainId             Int
+  balance             String   @default("0")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([smartAccountAddress])
+}
+
+model WalletBalance {
+  id        String   @id @default(uuid())
+  userId    String
+  asset     String   @default("ETH")
+  balance   String   @default("0")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, asset])
+  @@index([asset])
+}
+
+model Transaction {
+  id        String            @id @default(uuid())
+  userId    String
+  type      TransactionType
+  status    TransactionStatus @default(PENDING)
+  from      String?
+  to        String?
+  asset     String            @default("ETH")
+  amount    String
+  txHash    String?           @unique
+  chainId   Int
+  createdAt DateTime          @default(now())
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([txHash])
+}
+
+model Withdrawal {
+  id                  String        @id @default(uuid())
+  userId              String
+  status              RequestStatus @default(PENDING)
+  asset               String        @default("ETH")
+  amount              String
+  toAddress           String
+  chainId             Int
+  reviewedBy          String?
+  ledgerTransactionId String?
+  ledgerDebitedAt     DateTime?
+  txHash              String?
+  createdAt           DateTime      @default(now())
+  decidedAt           DateTime?
+  user                User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Conversion {
+  id         String   @id @default(uuid())
+  userId     String
+  fromAsset  String
+  toAsset    String
+  fromAmount String
+  toAmount   String?
+  chainId    Int
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model CardRequest {
+  id              String        @id @default(uuid())
+  userId          String
+  status          RequestStatus @default(PENDING)
+  cardType        String        @default("VIRTUAL")
+  design          String        @default("DEFAULT")
+  currency        String        @default("USD")
+  spendingLimit   String?
+  provider        String?
+  providerCardId  String?
+  last4           String?
+  deliveryName    String?
+  deliveryAddress String?
+  deliveryCity    String?
+  deliveryState   String?
+  deliveryZip     String?
+  deliveryCountry String?       @default("US")
+  deliveryPhone   String?
+  trackingNumber  String?
+  shippedAt       DateTime?
+  deliveredAt     DateTime?
+  activatedAt     DateTime?
+  frozenAt        DateTime?
+  createdAt       DateTime      @default(now())
+  decidedAt       DateTime?
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  actor     String
+  action    String
+  meta      String?
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id])
+
+  @@index([actor])
+  @@index([createdAt])
+}
+
+model Installment {
+  id               String               @id @default(uuid())
+  userId           String
+  walletId         String?
+  totalAmount      Decimal
+  interestRate     Decimal
+  totalPayable     Decimal
+  installmentCount Int
+  frequency        InstallmentFrequency
+  startDate        DateTime
+  nextDueDate      DateTime
+  status           InstallmentStatus    @default(ACTIVE)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payments         InstallmentPayment[]
+
+  @@index([userId])
+}
+
+model InstallmentPayment {
+  id            String        @id @default(uuid())
+  installmentId String
+  dueDate       DateTime
+  amountDue     Decimal
+  amountPaid    Decimal?
+  status        PaymentStatus @default(PENDING)
+  paidAt        DateTime?
+  transactionId String?
+  createdAt     DateTime      @default(now())
+  installment   Installment   @relation(fields: [installmentId], references: [id], onDelete: Cascade)
+
+  @@index([installmentId])
+  @@index([dueDate])
+}
+
+model Contact {
+  id         String   @id @default(uuid())
+  userId     String
+  name       String
+  address    String
+  email      String?
+  phone      String?
+  isFavorite Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, address])
+  @@index([userId])
+}
+
+model Notification {
+  id        String              @id @default(uuid())
+  userId    String
+  title     String
+  body      String
+  channel   NotificationChannel @default(IN_APP)
+  isRead    Boolean             @default(false)
+  meta      String?
+  createdAt DateTime            @default(now())
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead])
+  @@index([createdAt])
+}
+
+model BillPayment {
+  id            String            @id @default(uuid())
+  userId        String
+  billerName    String
+  billerCode    String?
+  accountNumber String
+  amount        String
+  asset         String            @default("ETH")
+  reference     String?
+  status        BillPaymentStatus @default(PENDING)
+  scheduledFor  DateTime?
+  paidAt        DateTime?
+  createdAt     DateTime          @default(now())
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Budget {
+  id          String   @id @default(uuid())
+  userId      String
+  name        String
+  category    String
+  limitAmount String
+  spentAmount String   @default("0")
+  asset       String   @default("ETH")
+  periodStart DateTime
+  periodEnd   DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model LoyaltyCard {
+  id            String    @id @default(uuid())
+  userId        String
+  merchantName  String
+  cardNumber    String
+  barcode       String?
+  pointsBalance String    @default("0")
+  expiresAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model GiftCard {
+  id           String         @id @default(uuid())
+  userId       String
+  merchantName String
+  code         String
+  initialValue String
+  currentValue String
+  currency     String         @default("USD")
+  status       GiftCardStatus @default(ACTIVE)
+  expiresAt    DateTime?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model BankAccount {
+  id               String            @id @default(uuid())
+  userId           String
+  bankName         String
+  accountLast4     String
+  routingNumber    String?
+  accountType      String            @default("checking")
+  plaidAccessToken String?
+  plaidAccountId   String?
+  status           BankAccountStatus @default(PENDING_VERIFICATION)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  user             User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model Subscription {
+  id              String             @id @default(uuid())
+  userId          String
+  tier            SubscriptionTier   @default(FREE)
+  status          SubscriptionStatus @default(ACTIVE)
+  priceAmount     String             @default("0")
+  asset           String             @default("ETH")
+  startDate       DateTime           @default(now())
+  nextBillingDate DateTime?
+  cancelledAt     DateTime?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Device {
+  id           String   @id @default(uuid())
+  userId       String
+  deviceName   String
+  deviceType   String
+  fingerprint  String
+  lastActiveAt DateTime @default(now())
+  ipAddress    String?
+  userAgent    String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fingerprint])
+  @@index([userId])
+}
+
+model WebAuthnCredential {
+  id           String    @id @default(uuid())
+  userId       String
+  credentialId String    @unique
+  publicKey    String
+  counter      Int       @default(0)
+  transports   String?
+  deviceType   String?
+  backedUp     Boolean   @default(false)
+  friendlyName String    @default("Security Key")
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model HealthCard {
+  id            String              @id @default(uuid())
+  userId        String
+  providerName  String
+  cardType      HealthCardType
+  encryptedData String
+  expiresAt     DateTime?
+  status        HealthCardStatus    @default(ACTIVE)
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  user          User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions  HealthTransaction[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+model HealthTransaction {
+  id           String                  @id @default(uuid())
+  userId       String
+  healthCardId String?
+  amount       String
+  asset        String                  @default("ETH")
+  currency     String                  @default("USD")
+  status       HealthTransactionStatus @default(PENDING)
+  description  String?
+  reference    String?
+  createdAt    DateTime                @default(now())
+  updatedAt    DateTime                @updatedAt
+  healthCard   HealthCard?             @relation(fields: [healthCardId], references: [id])
+  user         User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([healthCardId])
+  @@index([status])
+}
+
+model HealthReminder {
+  id        String               @id @default(uuid())
+  userId    String
+  type      String
+  message   String
+  remindAt  DateTime
+  status    HealthReminderStatus @default(PENDING)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([remindAt])
+  @@index([status])
+}
+
+model AdminConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model CryptoOrder {
+  id                String         @id @default(uuid())
+  userId            String
+  provider          OnRampProvider
+  status            OnRampStatus   @default(CREATED)
+  fiatCurrency      String         @default("USD")
+  fiatAmount        String
+  cryptoAsset       String         @default("ETH")
+  cryptoAmount      String?
+  walletAddress     String
+  chainId           Int
+  providerOrderId   String?
+  providerPaymentId String?
+  txHash            String?
+  widgetUrl         String?
+  completedAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([providerOrderId])
+  @@index([status])
+}
+
+model Booking {
+  id            String        @id @default(uuid())
+  userId        String
+  chamber       String
+  chamberName   String
+  date          String
+  timeSlot      String
+  duration      Int           @default(60)
+  priceUsd      String
+  paidWithAsset String?
+  paidAmount    String?
+  txHash        String?
+  status        BookingStatus @default(PENDING)
+  notes         String?
+  cancelledAt   DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([chamber, date, timeSlot])
+  @@index([userId])
+  @@index([date])
+  @@index([status])
+}
+
+model AdminWallet {
+  id        String   @id @default(uuid())
+  label     String   @default("Platform Treasury")
+  asset     String
+  balance   String   @default("0")
+  address   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([label, asset])
+  @@index([asset])
+}
+
+model AdminTransaction {
+  id          String   @id @default(uuid())
+  walletLabel String   @default("Platform Treasury")
+  asset       String
+  amount      String
+  type        String
+  description String?
+  reference   String?
+  createdAt   DateTime @default(now())
+
+  @@index([walletLabel])
+  @@index([type])
+  @@index([createdAt])
+}
+
+model OtpVerification {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  purpose   String   @default("LOGIN")
+  expiresAt DateTime
+  verified  Boolean  @default(false)
+  attempts  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([phone, code])
+  @@index([expiresAt])
+}
+
+model PaymentRequest {
+  id        String    @id @default(uuid())
+  userId    String
+  requestId String    @unique
+  amount    String?
+  asset     String    @default("ETH")
+  note      String?
+  qrData    String
+  chainId   Int
+  status    String    @default("PENDING")
+  paidBy    String?
+  paidAt    DateTime?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([requestId])
+  @@index([status])
+}
+
 enum UserRole {
   USER
   ADMIN
@@ -59,270 +607,11 @@ enum PaymentStatus {
   LATE
 }
 
-model User {
-  id        String     @id @default(uuid())
-  address   String     @unique
-  email     String?    @unique
-  password  String?
-  emailVerified      Boolean  @default(false)
-  emailVerificationToken String? // random token for email verification
-  emailVerificationExpiry DateTime?
-  name      String?
-  phone     String?
-  avatarUrl String?
-  pin       String?    // hashed 6-digit PIN for tx confirmation
-  twoFaSecret String? // encrypted TOTP secret for 2FA
-  twoFaEnabled Boolean  @default(false)
-  role      UserRole   @default(USER)
-  status    UserStatus @default(PENDING)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-
-  wallet          Wallet?
-  walletBalances  WalletBalance[]
-  transactions    Transaction[]
-  withdrawals     Withdrawal[]
-  conversions     Conversion[]
-  cardRequests    CardRequest[]
-  auditLogs       AuditLog[]
-  installments    Installment[]
-  contacts        Contact[]
-  notifications   Notification[]
-  billPayments    BillPayment[]
-  budgets         Budget[]
-  loyaltyCards    LoyaltyCard[]
-  giftCards       GiftCard[]
-  bankAccounts    BankAccount[]
-  subscriptions   Subscription[]
-  devices         Device[]
-  healthCards        HealthCard[]
-  healthTransactions HealthTransaction[]
-  healthReminders    HealthReminder[]
-  webauthnCredentials WebAuthnCredential[]
-  cryptoOrders       CryptoOrder[]
-  bookings           Booking[]
-  paymentRequests    PaymentRequest[]
-
-  @@index([status])
-  @@index([role])
-}
-
-model Wallet {
-  id                 String   @id @default(uuid())
-  userId             String   @unique
-  smartAccountAddress String
-  chainId            Int
-  balance            String   @default("0") // internal ledger balance in wei
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([smartAccountAddress])
-}
-
-// Per-asset internal ledger balances.
-// The Wallet model represents the linked smart account, while this table represents the internal ledger.
-model WalletBalance {
-  id        String   @id @default(uuid())
-  userId    String
-  asset     String   @default("ETH")
-  balance   String   @default("0")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, asset])
-  @@index([asset])
-}
-
-model Transaction {
-  id        String            @id @default(uuid())
-  userId    String
-  type      TransactionType
-  status    TransactionStatus @default(PENDING)
-  from      String?
-  to        String?
-  asset     String            @default("ETH")
-  amount    String
-  txHash    String?           @unique
-  chainId   Int
-  createdAt DateTime          @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([status])
-  @@index([txHash])
-}
-
-model Withdrawal {
-  id         String        @id @default(uuid())
-  userId     String
-  status     RequestStatus @default(PENDING)
-  asset      String        @default("ETH")
-  amount     String
-  toAddress  String
-  chainId    Int
-  reviewedBy String?       // admin who approved/rejected
-  ledgerTransactionId String? // internal ledger transaction id (once debited)
-  ledgerDebitedAt     DateTime?
-  txHash     String?       // on-chain tx hash once sent
-  createdAt  DateTime      @default(now())
-  decidedAt  DateTime?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([status])
-}
-
-model Conversion {
-  id         String   @id @default(uuid())
-  userId     String
-  fromAsset  String
-  toAsset    String
-  fromAmount String
-  toAmount   String?
-  chainId    Int
-  createdAt  DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-model CardRequest {
-  id            String        @id @default(uuid())
-  userId        String
-  status        RequestStatus @default(PENDING)
-  cardType      String        @default("VIRTUAL") // VIRTUAL or PHYSICAL
-  design        String        @default("DEFAULT")
-  currency      String        @default("USD")
-  spendingLimit String?       // monthly limit in fiat
-  provider      String?       
-  providerCardId String?
-  last4         String?
-  // Delivery address (for physical cards)
-  deliveryName    String?
-  deliveryAddress String?
-  deliveryCity    String?
-  deliveryState   String?
-  deliveryZip     String?
-  deliveryCountry String?     @default("US")
-  deliveryPhone   String?
-  trackingNumber  String?
-  shippedAt       DateTime?
-  deliveredAt     DateTime?
-  activatedAt     DateTime?
-  frozenAt        DateTime?
-  createdAt     DateTime      @default(now())
-  decidedAt     DateTime?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([status])
-}
-
-model AuditLog {
-  id        String   @id @default(uuid())
-  userId    String?
-  actor     String   // "ADMIN" or wallet address
-  action    String
-  meta      String?
-  createdAt DateTime @default(now())
-
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
-
-  @@index([actor])
-  @@index([createdAt])
-}
-
-model Installment {
-  id               String               @id @default(uuid())
-  userId           String
-  walletId         String?
-  totalAmount      Decimal
-  interestRate     Decimal
-  totalPayable     Decimal
-  installmentCount Int
-  frequency        InstallmentFrequency
-  startDate        DateTime
-  nextDueDate      DateTime
-  status           InstallmentStatus    @default(ACTIVE)
-  createdAt        DateTime             @default(now())
-  updatedAt        DateTime             @updatedAt
-
-  payments InstallmentPayment[]
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-model InstallmentPayment {
-  id            String        @id @default(uuid())
-  installmentId String
-  dueDate       DateTime
-  amountDue     Decimal
-  amountPaid    Decimal?
-  status        PaymentStatus @default(PENDING)
-  paidAt        DateTime?
-  transactionId String?
-  createdAt     DateTime      @default(now())
-
-  installment Installment @relation(fields: [installmentId], references: [id], onDelete: Cascade)
-
-  @@index([installmentId])
-  @@index([dueDate])
-}
-
-// ─── Contacts / Address Book ───
-
-model Contact {
-  id        String   @id @default(uuid())
-  userId    String
-  name      String
-  address   String   // wallet address
-  email     String?
-  phone     String?
-  isFavorite Boolean @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, address])
-  @@index([userId])
-}
-
-// ─── Notifications ───
-
 enum NotificationChannel {
   IN_APP
   EMAIL
   PUSH
 }
-
-model Notification {
-  id        String              @id @default(uuid())
-  userId    String
-  title     String
-  body      String
-  channel   NotificationChannel @default(IN_APP)
-  isRead    Boolean             @default(false)
-  meta      String?
-  createdAt DateTime            @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, isRead])
-  @@index([createdAt])
-}
-
-// ─── Bill Payments ───
 
 enum BillPaymentStatus {
   PENDING
@@ -331,92 +620,11 @@ enum BillPaymentStatus {
   SCHEDULED
 }
 
-model BillPayment {
-  id            String            @id @default(uuid())
-  userId        String
-  billerName    String
-  billerCode    String?
-  accountNumber String
-  amount        String
-  asset         String            @default("ETH")
-  reference     String?
-  status        BillPaymentStatus @default(PENDING)
-  scheduledFor  DateTime?
-  paidAt        DateTime?
-  createdAt     DateTime          @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([status])
-}
-
-// ─── Budgets ───
-
-model Budget {
-  id         String   @id @default(uuid())
-  userId     String
-  name       String
-  category   String   // e.g., "Food", "Transport", "Entertainment", "Bills"
-  limitAmount String  // monthly spending limit in wei
-  spentAmount String  @default("0") // current month spend
-  asset       String  @default("ETH")
-  periodStart DateTime
-  periodEnd   DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-// ─── Loyalty Cards ───
-
-model LoyaltyCard {
-  id           String   @id @default(uuid())
-  userId       String
-  merchantName String
-  cardNumber   String
-  barcode      String?
-  pointsBalance String @default("0")
-  expiresAt    DateTime?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-// ─── Gift Cards ───
-
 enum GiftCardStatus {
   ACTIVE
   REDEEMED
   EXPIRED
 }
-
-model GiftCard {
-  id          String         @id @default(uuid())
-  userId      String
-  merchantName String
-  code        String
-  initialValue String
-  currentValue String
-  currency    String         @default("USD")
-  status      GiftCardStatus @default(ACTIVE)
-  expiresAt   DateTime?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([status])
-}
-
-// ─── Bank Accounts ───
 
 enum BankAccountStatus {
   PENDING_VERIFICATION
@@ -424,26 +632,6 @@ enum BankAccountStatus {
   FAILED
   REMOVED
 }
-
-model BankAccount {
-  id             String            @id @default(uuid())
-  userId         String
-  bankName       String
-  accountLast4   String
-  routingNumber  String?
-  accountType    String            @default("checking") // checking, savings
-  plaidAccessToken String?
-  plaidAccountId   String?
-  status         BankAccountStatus @default(PENDING_VERIFICATION)
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-// ─── Subscriptions ───
 
 enum SubscriptionStatus {
   ACTIVE
@@ -458,67 +646,6 @@ enum SubscriptionTier {
   PREMIUM
   ENTERPRISE
 }
-
-model Subscription {
-  id          String             @id @default(uuid())
-  userId      String
-  tier        SubscriptionTier   @default(FREE)
-  status      SubscriptionStatus @default(ACTIVE)
-  priceAmount String             @default("0")
-  asset       String             @default("ETH")
-  startDate   DateTime           @default(now())
-  nextBillingDate DateTime?
-  cancelledAt DateTime?
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([status])
-}
-
-// ─── Device / Session Management ───
-
-model Device {
-  id           String   @id @default(uuid())
-  userId       String
-  deviceName   String
-  deviceType   String   // "mobile", "desktop", "tablet"
-  fingerprint  String
-  lastActiveAt DateTime @default(now())
-  ipAddress    String?
-  userAgent    String?
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, fingerprint])
-  @@index([userId])
-}
-
-// ─── WebAuthn Credentials ───
-
-model WebAuthnCredential {
-  id                  String   @id @default(uuid())
-  userId              String
-  credentialId        String   @unique // base64url-encoded credential ID
-  publicKey           String   // base64url-encoded COSE public key
-  counter             Int      @default(0)
-  transports          String?  // comma-separated: usb, ble, nfc, internal
-  deviceType          String?  // platform, cross-platform
-  backedUp            Boolean  @default(false)
-  friendlyName        String   @default("Security Key")
-  createdAt           DateTime @default(now())
-  lastUsedAt          DateTime?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-}
-
-// ─── Health Module ───
 
 enum HealthCardType {
   INSURANCE
@@ -544,72 +671,6 @@ enum HealthReminderStatus {
   COMPLETED
 }
 
-model HealthCard {
-  id            String           @id @default(uuid())
-  userId        String
-  providerName  String
-  cardType      HealthCardType
-  encryptedData String           // AES-256 encrypted JSON
-  expiresAt     DateTime?
-  status        HealthCardStatus @default(ACTIVE)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-
-  user         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions HealthTransaction[]
-
-  @@index([userId])
-  @@index([status])
-}
-
-model HealthTransaction {
-  id            String                  @id @default(uuid())
-  userId        String
-  healthCardId  String?
-  amount        String                  // in wei
-  asset         String                  @default("ETH")
-  currency      String                  @default("USD")
-  status        HealthTransactionStatus @default(PENDING)
-  description   String?                 // e.g., "Doctor visit", "Prescription refill"
-  reference     String?
-  createdAt     DateTime                @default(now())
-  updatedAt     DateTime                @updatedAt
-
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  healthCard HealthCard? @relation(fields: [healthCardId], references: [id], onDelete: SetNull)
-
-  @@index([userId])
-  @@index([healthCardId])
-  @@index([status])
-}
-
-model HealthReminder {
-  id        String               @id @default(uuid())
-  userId    String
-  type      String               // Appointment / Medication / PremiumDue
-  message   String
-  remindAt  DateTime
-  status    HealthReminderStatus @default(PENDING)
-  createdAt DateTime             @default(now())
-  updatedAt DateTime             @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([remindAt])
-  @@index([status])
-}
-
-// ─────────── Admin Config (Key-Value for admin TOTP etc.) ───────────
-
-model AdminConfig {
-  key       String   @id
-  value     String
-  updatedAt DateTime @updatedAt
-}
-
-// ─────────── Crypto On-Ramp Orders ───────────
-
 enum OnRampProvider {
   TRANSAK
   MOONPAY
@@ -625,135 +686,10 @@ enum OnRampStatus {
   EXPIRED
 }
 
-model CryptoOrder {
-  id                String        @id @default(uuid())
-  userId            String
-  provider          OnRampProvider
-  status            OnRampStatus  @default(CREATED)
-  fiatCurrency      String        @default("USD")
-  fiatAmount        String
-  cryptoAsset       String        @default("ETH")
-  cryptoAmount      String?       // filled when completed
-  walletAddress     String
-  chainId           Int
-  providerOrderId   String?       // external order ID from provider
-  providerPaymentId String?       // external payment reference
-  txHash            String?       // on-chain tx once crypto delivered
-  widgetUrl         String?       // the URL user was sent to
-  completedAt       DateTime?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([providerOrderId])
-  @@index([status])
-}
-
-// ─────────── Medbed Chamber Bookings ───────────
-
 enum BookingStatus {
   PENDING
   CONFIRMED
   CANCELLED
   COMPLETED
   NO_SHOW
-}
-
-model Booking {
-  id          String        @id @default(uuid())
-  userId      String
-  chamber     String        // ALPHA, BETA, OMEGA
-  chamberName String        // display name
-  date        String        // YYYY-MM-DD
-  timeSlot    String        // e.g. "09:00 AM"
-  duration    Int           @default(60)  // minutes
-  priceUsd    String        // price in USD cents string
-  paidWithAsset String?     // ETH, USDC, or FIAT
-  paidAmount    String?     // amount paid
-  txHash        String?     // on-chain payment hash
-  status      BookingStatus @default(PENDING)
-  notes       String?
-  cancelledAt DateTime?
-  completedAt DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([date])
-  @@index([status])
-  @@unique([chamber, date, timeSlot]) // prevent double-booking
-}
-
-// ─── Admin / Platform Treasury Wallet ───
-
-model AdminWallet {
-  id          String   @id @default(uuid())
-  label       String   @default("Platform Treasury")
-  asset       String   // ETH, USDC, BTC, etc.
-  balance     String   @default("0")
-  address     String?  // on-chain address if applicable
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  @@unique([label, asset])
-  @@index([asset])
-}
-
-model AdminTransaction {
-  id          String   @id @default(uuid())
-  walletLabel String   @default("Platform Treasury")
-  asset       String
-  amount      String
-  type        String   // CREDIT, DEBIT, FEE_COLLECTED, WITHDRAWAL_PAYOUT, SUBSCRIPTION_FEE
-  description String?
-  reference   String?  // link to related record (subscriptionId, withdrawalId, etc.)
-  createdAt   DateTime @default(now())
-
-  @@index([walletLabel])
-  @@index([type])
-  @@index([createdAt])
-}
-
-// ─── eSIM / OTP Verification ───
-
-model OtpVerification {
-  id        String   @id @default(uuid())
-  phone     String
-  code      String
-  purpose   String   @default("LOGIN") // LOGIN, TX_CONFIRM, 2FA_SETUP
-  expiresAt DateTime
-  verified  Boolean  @default(false)
-  attempts  Int      @default(0)
-  createdAt DateTime @default(now())
-
-  @@index([phone, code])
-  @@index([expiresAt])
-}
-
-// ─── Payment Requests (QR-based) ───
-
-model PaymentRequest {
-  id        String    @id @default(uuid())
-  userId    String
-  requestId String    @unique // short unique ID embedded in QR
-  amount    String?   // requested amount in wei (null = any amount)
-  asset     String    @default("ETH")
-  note      String?
-  qrData    String    // full JSON payload encoded in QR
-  chainId   Int
-  status    String    @default("PENDING") // PENDING, PAID, CANCELLED, EXPIRED
-  paidBy    String?   // wallet address of payer once fulfilled
-  paidAt    DateTime?
-  expiresAt DateTime?
-  createdAt DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([requestId])
-  @@index([status])
 }
