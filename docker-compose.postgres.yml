@@ -1,0 +1,20 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: smartwallet-postgres
+    environment:
+      POSTGRES_DB: smartwallet
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - smartwallet_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d smartwallet"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  smartwallet_pgdata:

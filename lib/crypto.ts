@@ -18,6 +18,7 @@ const SALT = "smart-wallet-health-module-salt"; // fixed salt for key derivation
 function getEncryptionKey(): Buffer {
   const secret =
     process.env.HEALTH_ENCRYPTION_KEY ??
+    process.env.ENCRYPTION_KEY ??
     "dev-health-encryption-key-change-in-production";
   // Derive a 32-byte key from the secret using scrypt
   return scryptSync(secret, SALT, 32);

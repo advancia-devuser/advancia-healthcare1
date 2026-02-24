@@ -1,0 +1,23 @@
+Category,Item,Required,Where to get it,Example/Format,Set in (.env/.env.local or hosting env vars),Status (TODO/DONE),Notes
+Database,DATABASE_URL,YES,"Local: docker compose postgres; or Supabase: Project Settings → Database → Connection string",postgresql://USER:PASSWORD@HOST:PORT/DB?sslmode=require,.env (recommended source for Prisma CLI),TODO,"For local docker in this repo: postgresql://postgres:postgres@localhost:5433/smartwallet?sslmode=disable"
+Auth (User),USER_JWT_SECRET,YES,"Generate random secret",64+ hex chars (32 bytes),.env + hosting env vars,TODO,"Required in production (app throws if missing)"
+Auth (Admin),ADMIN_JWT_SECRET,YES,"Generate random secret",64+ hex chars (32 bytes),.env + hosting env vars,TODO,"Required in production (app throws if missing)"
+Admin,ADMIN_PASSWORD,YES,"You choose","Strong password",.env + hosting env vars,TODO,"Used by /api/admin/login"
+Encryption,ENCRYPTION_KEY,If using Health features,"Generate random secret",64 hex chars (32 bytes),.env + hosting env vars,TODO,"Used to encrypt health data; don’t keep the sample value"
+SMS,TEXTBELT_API_KEY (preferred) / TEXTBELT (alias),Optional,"Textbelt dashboard (rotate if exposed)",Textbelt key,.env.local or hosting env vars,TODO,"Can force provider via SMS_PROVIDER=textbelt"
+SMS,SMS_PROVIDER,Optional,"You choose",auto|brevo|twilio|textbelt,.env.local or hosting env vars,TODO,"Default is auto"
+SMS (Brevo),BREVO_API_KEY,Optional,"Brevo dashboard",API key,.env.local or hosting env vars,TODO,"If set, Brevo is tried first"
+SMS (Brevo),BREVO_SENDER_NAME,Optional,"You choose",Advancia,.env.local or hosting env vars,TODO,
+SMS (Twilio),TWILIO_ACCOUNT_SID,Optional,"Twilio console",ACxxxxxxxx,.env.local or hosting env vars,TODO,
+SMS (Twilio),TWILIO_AUTH_TOKEN,Optional,"Twilio console",token,.env.local or hosting env vars,TODO,
+SMS (Twilio),TWILIO_PHONE_NUMBER,Optional,"Twilio console",+1xxxxxxxxxx,.env.local or hosting env vars,TODO,
+Email,RESEND_API_KEY,Optional,"Resend dashboard",re_...,.env.local or hosting env vars,TODO,"If missing, email sends are logged to console"
+Email,EMAIL_FROM,Optional,"You choose",Name <noreply@domain>,.env.local or hosting env vars,TODO,
+Email,NEXT_PUBLIC_APP_URL,Optional,"Your site URL",https://your-domain.com,.env.local or hosting env vars,TODO,"Used for links in email templates"
+Wallet (Alchemy),NEXT_PUBLIC_ALCHEMY_API_KEY,Optional,"Alchemy dashboard",string,.env.local or hosting env vars,TODO,"Only needed for wallet/passkey/social login"
+Wallet (Alchemy),NEXT_PUBLIC_ALCHEMY_POLICY_ID,Optional,"Alchemy dashboard",uuid,.env.local or hosting env vars,TODO,
+Wallet (Alchemy),NEXT_PUBLIC_CHAIN_ID,Optional,"You choose",421614,.env.local or hosting env vars,TODO,
+Deploy,Node version,YES,"Your runtime (Vercel/Docker)",Node 20+,,TODO,"Dockerfile uses node:20-alpine"
+Local Dev,Start Postgres container,If using local Postgres,"Run in repo root",docker compose -f docker-compose.postgres.yml up -d,,TODO,"Port mapped to 5433 on host"
+Local Dev,Run migrations,YES,"Run in repo root",npx prisma migrate deploy,,TODO,"Uses DATABASE_URL from .env"
+Local Dev,Start app,YES,"Run in repo root",npm run dev,,TODO,"If port 3000 is in use, run with a different port"

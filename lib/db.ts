@@ -5,6 +5,19 @@ function assertDatabaseUrlIsSsl(url: string | undefined) {
   const isPostgres = url.startsWith("postgresql://") || url.startsWith("postgres://");
   if (!isPostgres) return;
 
+  // Local/dev Postgres typically runs without SSL; don't warn for localhost in non-production.
+  try {
+    const u = new URL(url);
+    const host = u.hostname;
+    const isLocalHost = host === "localhost" || host === "127.0.0.1";
+    const sslmode = u.searchParams.get("sslmode")?.toLowerCase();
+    if (process.env.NODE_ENV !== "production" && isLocalHost) {
+      if (!sslmode || sslmode === "disable") return;
+    }
+  } catch {
+    // If URL parsing fails, fall through to regex-based checks.
+  }
+
   const hasSslMode = /[?&]sslmode=(require|verify-ca|verify-full)\b/i.test(url);
   if (!hasSslMode) {
     const msg =
