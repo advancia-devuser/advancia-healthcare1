@@ -3,6 +3,7 @@
 # dependencies
 /node_modules
 /node_modules_corrupt
+alchemy-demo/
 /.pnp
 .pnp.js
 .yarn/install-state.gz
@@ -38,3 +39,4 @@ yarn-error.log*
 next-env.d.ts
 *.db
 jest-*.txt
+vercel_output.txt

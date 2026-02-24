@@ -350,7 +350,6 @@ export default function TransfersTab({
             {renderTransactionHistory()}
           </CardContent>
         </Card>
-      </Card>
       </div> {/* end grid */}
 
       {/* Outgoing Payment Requests */}

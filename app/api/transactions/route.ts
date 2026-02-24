@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/auth";
-import { Alchemy, Network } from "alchemy-sdk";
+import { Alchemy, Network, AssetTransfersCategory } from "alchemy-sdk";
 
 const config = {
   apiKey: process.env.NEXT_PUBLIC_ALCHEMY_API_KEY,
@@ -23,7 +23,13 @@ export async function GET(request: Request) {
       withMetadata: true,
       excludeZeroValue: true,
       maxCount: 100,
-      category: ["external", "internal", "erc20", "erc721", "erc1155"],
+      category: [
+        AssetTransfersCategory.EXTERNAL,
+        AssetTransfersCategory.INTERNAL,
+        AssetTransfersCategory.ERC20,
+        AssetTransfersCategory.ERC721,
+        AssetTransfersCategory.ERC1155,
+      ],
     });
 
     // Also query transfers sent *from* the user's address
@@ -33,7 +39,13 @@ export async function GET(request: Request) {
       withMetadata: true,
       excludeZeroValue: true,
       maxCount: 100,
-      category: ["external", "internal", "erc20", "erc721", "erc1155"],
+      category: [
+        AssetTransfersCategory.EXTERNAL,
+        AssetTransfersCategory.INTERNAL,
+        AssetTransfersCategory.ERC20,
+        AssetTransfersCategory.ERC721,
+        AssetTransfersCategory.ERC1155,
+      ],
     });
 
     // Combine and sort transfers by block number
