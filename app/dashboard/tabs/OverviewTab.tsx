@@ -10,6 +10,7 @@ export default function OverviewTab({
   setShowSendModal,
   setShowReceiveModal,
   setShowBuyModal,
+  setShowPaymentQrModal,
   setBuyStep,
   setBuyForm,
   setBuyWidgetUrl,
@@ -40,7 +41,7 @@ export default function OverviewTab({
               <Button variant="outline" size="sm" className="gap-1 border-green-200 text-green-700 hover:bg-green-50" onClick={() => { setShowBuyModal(true); setBuyStep("select"); setBuyForm({ provider: "", fiatAmount: "", fiatCurrency: "USD", cryptoAsset: "ETH" }); setBuyWidgetUrl(""); }}>
                 <ShoppingCart className="w-3.5 h-3.5" /> Buy
               </Button>
-              <Button variant="outline" size="sm" className="gap-1 border-blue-200 text-blue-700 hover:bg-blue-50" onClick={() => setShowReceiveModal(true)}>
+              <Button variant="outline" size="sm" className="gap-1 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => setShowPaymentQrModal(true)}>
                 <QrCode className="w-3.5 h-3.5" /> QR
               </Button>
             </div>

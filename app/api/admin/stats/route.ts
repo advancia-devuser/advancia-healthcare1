@@ -21,6 +21,9 @@ export async function GET() {
       pendingWithdrawals,
       totalCardRequests,
       recentTransactions,
+      totalPaymentRequests,
+      pendingPaymentRequests,
+      paidPaymentRequests,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { status: "PENDING" } }),
@@ -34,6 +37,9 @@ export async function GET() {
         take: 10,
         include: { user: { select: { address: true, email: true } } },
       }),
+      prisma.paymentRequest.count(),
+      prisma.paymentRequest.count({ where: { status: "PENDING" } }),
+      prisma.paymentRequest.count({ where: { status: "PAID" } }),
     ]);
 
     return NextResponse.json({
@@ -45,6 +51,11 @@ export async function GET() {
       pendingWithdrawals,
       totalCardRequests,
       recentTransactions,
+      paymentRequests: {
+        total: totalPaymentRequests,
+        pending: pendingPaymentRequests,
+        paid: paidPaymentRequests,
+      },
     });
   } catch (err: any) {
     return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 });

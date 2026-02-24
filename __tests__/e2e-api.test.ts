@@ -188,6 +188,21 @@ describeE2E("Data Isolation (Unauthenticated)", () => {
     const { status } = await api("/api/gift-cards");
     expect(status).toBe(401);
   });
+
+  test("GET /api/payments/qr without auth returns 401", async () => {
+    const { status } = await api("/api/payments/qr?amount=100&asset=ETH");
+    expect(status).toBe(401);
+  });
+
+  test("GET /api/payments/history without auth returns 401", async () => {
+    const { status } = await api("/api/payments/history");
+    expect(status).toBe(401);
+  });
+
+  test("GET /api/payments/request without auth returns 401", async () => {
+    const { status } = await api("/api/payments/request");
+    expect(status).toBe(401);
+  });
 });
 
 /* ═══════════════════════════════════════════
@@ -233,6 +248,19 @@ describeE2E("Admin Access Control", () => {
     });
     expect([401, 403]).toContain(status);
   });
+
+  test("GET /api/admin/payment-requests without admin cookie returns 401 or 403", async () => {
+    const { status } = await api("/api/admin/payment-requests");
+    expect([401, 403]).toContain(status);
+  });
+
+  test("PATCH /api/admin/payment-requests without admin cookie returns 401 or 403", async () => {
+    const { status } = await api("/api/admin/payment-requests", {
+      method: "PATCH",
+      body: JSON.stringify({ id: "fake-id", action: "cancel" }),
+    });
+    expect([401, 403]).toContain(status);
+  });
 });
 
 /* ═══════════════════════════════════════════
@@ -252,6 +280,7 @@ describeE2E("Cron Route Protection", () => {
     "/api/cron/subscriptions",
     "/api/cron/installments",
     "/api/cron/reconcile",
+    "/api/cron/payment-requests",
   ];
 
   for (const route of cronRoutes) {
@@ -412,7 +441,54 @@ describeE2E("Wallet Address Uniqueness", () => {
 });
 
 /* ═══════════════════════════════════════════
-   10. PAGES RETURN HTML
+   10. PAYMENT QR ROUTES
+   ═══════════════════════════════════════════ */
+
+describeE2E("Payment QR Routes", () => {
+  test("GET /api/payments/qr without auth returns 401", async () => {
+    const { status } = await api("/api/payments/qr?amount=1000000000000000&asset=ETH");
+    expect(status).toBe(401);
+  });
+
+  test("POST /api/payments/qr without auth returns 401", async () => {
+    const { status } = await api("/api/payments/qr", {
+      method: "POST",
+      body: JSON.stringify({ qrData: '{"type":"smartwallet-pay"}' }),
+    });
+    expect(status).toBe(401);
+  });
+
+  test("POST /api/payments/qr without body returns 400", async () => {
+    // This only applies if we bypass auth; auth should reject first
+    const { status } = await api("/api/payments/qr", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    // 401 = no auth, 400 = missing qrData (would apply to authenticated user)
+    expect([400, 401]).toContain(status);
+  });
+
+  test("GET /api/payments/history without auth returns 401", async () => {
+    const { status } = await api("/api/payments/history");
+    expect(status).toBe(401);
+  });
+
+  test("GET /api/payments/request without auth returns 401", async () => {
+    const { status } = await api("/api/payments/request");
+    expect(status).toBe(401);
+  });
+
+  test("POST /api/payments/request without auth returns 401", async () => {
+    const { status } = await api("/api/payments/request", {
+      method: "POST",
+      body: JSON.stringify({ amount: "1000000000000000", asset: "ETH" }),
+    });
+    expect(status).toBe(401);
+  });
+});
+
+/* ═══════════════════════════════════════════
+   11. PAGES RETURN HTML
    ═══════════════════════════════════════════ */
 
 describeE2E("Page Routes", () => {

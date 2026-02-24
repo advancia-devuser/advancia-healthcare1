@@ -100,6 +100,7 @@ model User {
   webauthnCredentials WebAuthnCredential[]
   cryptoOrders       CryptoOrder[]
   bookings           Booking[]
+  paymentRequests    PaymentRequest[]
 
   @@index([status])
   @@index([role])
@@ -730,4 +731,28 @@ model OtpVerification {
 
   @@index([phone, code])
   @@index([expiresAt])
+}
+
+// ─── Payment Requests (QR-based) ───
+
+model PaymentRequest {
+  id        String    @id @default(uuid())
+  userId    String
+  requestId String    @unique // short unique ID embedded in QR
+  amount    String?   // requested amount in wei (null = any amount)
+  asset     String    @default("ETH")
+  note      String?
+  qrData    String    // full JSON payload encoded in QR
+  chainId   Int
+  status    String    @default("PENDING") // PENDING, PAID, CANCELLED, EXPIRED
+  paidBy    String?   // wallet address of payer once fulfilled
+  paidAt    DateTime?
+  expiresAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([requestId])
+  @@index([status])
 }

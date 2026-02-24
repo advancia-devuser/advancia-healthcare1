@@ -25,6 +25,7 @@ import BudgetsTab from "./tabs/BudgetsTab";
 import CardsTab from "./tabs/CardsTab";
 import HealthTab from "./tabs/HealthTab";
 import SettingsTab from "./tabs/SettingsTab";
+import PaymentQrModal from "../components/payment-qr-modal";
 
 /* ─── Types ─── */
 interface UserProfile {
@@ -78,6 +79,7 @@ export default function Dashboard() {
   const [healthTransactions, setHealthTransactions] = useState<any[]>([]);
   const [healthReminders, setHealthReminders] = useState<any[]>([]);
   const [healthReminderSummary, setHealthReminderSummary] = useState<any>(null);
+  const [paymentRequests, setPaymentRequests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -106,6 +108,7 @@ export default function Dashboard() {
   });
   const [showSendModal, setShowSendModal] = useState(false);
   const [showReceiveModal, setShowReceiveModal] = useState(false);
+  const [showPaymentQrModal, setShowPaymentQrModal] = useState(false);
   const [showBuyModal, setShowBuyModal] = useState(false);
   const [buyStep, setBuyStep] = useState<"select" | "configure" | "widget">("select");
   const [buyForm, setBuyForm] = useState({ provider: "" as string, fiatAmount: "", fiatCurrency: "USD", cryptoAsset: "ETH" });
@@ -131,7 +134,7 @@ export default function Dashboard() {
       setLoading(true);
       setError("");
       try {
-        const [profileRes, txRes, wdRes, cardRes, notifRes, budgetRes, subRes, contactRes, loyaltyRes, giftRes, bankRes, billRes, hCardRes, hTxRes, hRemRes, buyRes] = await Promise.all([
+        const [profileRes, txRes, wdRes, cardRes, notifRes, budgetRes, subRes, contactRes, loyaltyRes, giftRes, bankRes, billRes, hCardRes, hTxRes, hRemRes, buyRes, payReqRes] = await Promise.all([
           fetch("/api/profile", { headers: headers(addr) }),
           fetch("/api/transactions?limit=10", { headers: headers(addr) }),
           fetch("/api/withdrawals", { headers: headers(addr) }),
@@ -148,6 +151,7 @@ export default function Dashboard() {
           fetch("/api/health/transactions?limit=10", { headers: headers(addr) }),
           fetch("/api/health/reminders", { headers: headers(addr) }),
           fetch("/api/buy", { headers: headers(addr) }),
+          fetch("/api/payments/request?limit=10", { headers: headers(addr) }),
         ]);
 
         const profileData = await profileRes.json();
@@ -166,6 +170,7 @@ export default function Dashboard() {
         const hTxData = await hTxRes.json();
         const hRemData = await hRemRes.json();
         const buyData = buyRes.ok ? await buyRes.json() : { orders: [] };
+        const payReqData = payReqRes.ok ? await payReqRes.json() : { requests: [] };
 
         setProfile(profileData.user);
         setBalance(profileData.wallet?.balance ? formatBalance(profileData.wallet.balance) : "0.0000");
@@ -192,6 +197,7 @@ export default function Dashboard() {
         setHealthReminders(hRemData.reminders || []);
         setHealthReminderSummary(hRemData.summary || null);
         setBuyOrders(buyData.orders || []);
+        setPaymentRequests(payReqData.requests || []);
 
         // Show welcome message if it's a new session
         if (!sessionStorage.getItem("welcomed_" + addr)) {
@@ -209,6 +215,24 @@ export default function Dashboard() {
   }, [addr]);
 
   // Actions
+  async function handleQrConfirmPay(qrData: string, pin?: string): Promise<any> {
+    const res = await fetch("/api/payments/qr", {
+      method: "POST",
+      headers: h(),
+      body: JSON.stringify({ qrData, confirm: true, pin }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error);
+    // Refresh balance and payment requests
+    setBalance(formatBalance(data.transfer?.senderBalance || "0"));
+    const updatedPayReq = await fetch("/api/payments/request?limit=10", { headers: h() });
+    if (updatedPayReq.ok) {
+      const prData = await updatedPayReq.json();
+      setPaymentRequests(prData.requests || []);
+    }
+    return data;
+  }
+
   async function handleSaveProfile() {
     setActionLoading(true); setActionMsg("");
     try {
@@ -559,6 +583,11 @@ export default function Dashboard() {
           <span className="text-sm">{actionMsg}</span>
           <button onClick={() => setActionMsg("")}><X className="w-4 h-4" /></button>
         </div>
+      )}
+
+      {/* Payment QR Modal */}
+      {showPaymentQrModal && (
+        <PaymentQrModal onClose={() => setShowPaymentQrModal(false)} toast={toast} />
       )}
 
       {/* Send Modal */}
@@ -986,6 +1015,7 @@ export default function Dashboard() {
             setShowSendModal={setShowSendModal}
             setShowReceiveModal={setShowReceiveModal}
             setShowBuyModal={setShowBuyModal}
+            setShowPaymentQrModal={setShowPaymentQrModal}
             setBuyStep={setBuyStep}
             setBuyForm={setBuyForm}
             setBuyWidgetUrl={setBuyWidgetUrl}
@@ -1001,6 +1031,11 @@ export default function Dashboard() {
             handleSend={handleSend}
             actionLoading={actionLoading}
             transactions={transactions}
+            paymentRequests={paymentRequests}
+            setPaymentRequests={setPaymentRequests}
+            handleQrConfirmPay={handleQrConfirmPay}
+            toast={toast}
+            profile={profile}
             formatBalance={formatBalance}
           />
         )}
