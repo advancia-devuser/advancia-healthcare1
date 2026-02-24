@@ -14,6 +14,7 @@
  *   TWILIO_AUTH_TOKEN      — Twilio Auth Token
  *   TWILIO_PHONE_NUMBER    — Twilio phone number
  *   TEXTBELT_API_KEY       — Textbelt key ("textbelt" for 1 free/day, or paid key)
+ *   TEXTBELT               — Alias for TEXTBELT_API_KEY
  *   SMS_PROVIDER           — Force provider: "brevo" | "twilio" | "textbelt" | "auto" (default)
  */
 
@@ -38,7 +39,7 @@ const BREVO_SENDER_NAME = process.env.BREVO_SENDER_NAME || "Advancia";
 const TWILIO_ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID || "";
 const TWILIO_AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN || "";
 const TWILIO_PHONE_NUMBER = process.env.TWILIO_PHONE_NUMBER || "";
-const TEXTBELT_API_KEY = process.env.TEXTBELT_API_KEY || "";
+const TEXTBELT_API_KEY = process.env.TEXTBELT_API_KEY || process.env.TEXTBELT || "";
 const SMS_PROVIDER = process.env.SMS_PROVIDER || "auto";
 
 /* ─── Provider: Brevo (ex-Sendinblue) ─── */
