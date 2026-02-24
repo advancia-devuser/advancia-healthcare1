@@ -1,7 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Send, History, ArrowDownToLine, Loader2, QrCode, CheckCircle, AlertCircle, Ban, Clock, Zap } from "lucide-react";
-import { useState } from "react";
+import { Send, History, ArrowDownToLine, Loader2, QrCode, CheckCircle, AlertCircle, Ban, Clock, Zap, ArrowUpRight, ArrowDownLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useUser } from "@account-kit/react";
+import { shortenAddress } from "@/lib/utils";
+import Link from "next/link";
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: "bg-yellow-100 text-yellow-700",
@@ -14,7 +17,6 @@ export default function TransfersTab({
   sendForm,
   setSendForm,
   contacts,
-  transactions,
   handleSend,
   actionLoading,
   paymentRequests,
@@ -24,6 +26,9 @@ export default function TransfersTab({
   profile,
   formatBalance,
 }: any) {
+  const { user } = useUser();
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [qrInput, setQrInput] = useState("");
   const [qrParsing, setQrParsing] = useState(false);
   const [qrParsed, setQrParsed] = useState<any>(null);
@@ -31,6 +36,23 @@ export default function TransfersTab({
   const [qrConfirming, setQrConfirming] = useState(false);
   const [qrPin, setQrPin] = useState("");
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function fetchTransactions() {
+      try {
+        setLoading(true);
+        const res = await fetch("/api/transactions");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        setTransactions(data);
+      } catch (e: any) {
+        toast.error("Failed to fetch transactions", e.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+    fetchTransactions();
+  }, [toast]);
 
   async function handleParseQr() {
     if (!qrInput.trim()) return;
@@ -98,6 +120,57 @@ export default function TransfersTab({
       setCancellingId(null);
     }
   }
+
+  const renderTransactionHistory = () => {
+    if (loading) {
+      return (
+        <div className="flex justify-center items-center h-40">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      );
+    }
+
+    if (transactions.length === 0) {
+      return <p className="text-center text-muted-foreground py-8">No transactions yet.</p>;
+    }
+
+    return (
+      <ul className="space-y-3">
+        {transactions.map((tx: any) => {
+          const isSent = tx.from.toLowerCase() === user?.address.toLowerCase();
+          const value = tx.value ? parseFloat(tx.value).toFixed(5) : "0";
+          const symbol = tx.asset;
+          const otherAddress = isSent ? tx.to : tx.from;
+
+          return (
+            <li key={tx.hash} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+              <div className="flex items-center gap-3">
+                <div className={`w-9 h-9 rounded-full flex items-center justify-center ${isSent ? 'bg-red-100' : 'bg-green-100'}`}>
+                  {isSent ? <ArrowUpRight className="w-5 h-5 text-red-600" /> : <ArrowDownLeft className="w-5 h-5 text-green-600" />}
+                </div>
+                <div>
+                  <p className="font-semibold">{isSent ? "Sent" : "Received"} {symbol}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {isSent ? "To" : "From"}: {shortenAddress(otherAddress)}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className={`font-bold ${isSent ? 'text-red-600' : 'text-green-600'}`}>
+                  {isSent ? "-" : "+"}
+                  {value} {symbol}
+                </p>
+                <Link href={`https://sepolia.arbiscan.io/tx/${tx.hash}`} target="_blank" className="text-xs text-blue-500 hover:underline">
+                  View on Arbiscan
+                </Link>
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+    );
+  };
+
 
   function handleClearQr() {
     setQrInput("");
@@ -270,39 +343,13 @@ export default function TransfersTab({
               <div className="p-1.5 bg-gray-100 rounded-md">
                 <History className="w-4 h-4 text-gray-600" />
               </div>
-              Transfer History
+              Transaction History
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {transactions.filter((t: any) => t.type === "SEND" || t.type === "RECEIVE").length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-muted-foreground">
-                  <History className="w-10 h-10 mb-3 opacity-20" />
-                  <p>No transfers yet</p>
-                </div>
-              ) : transactions.filter((t: any) => t.type === "SEND" || t.type === "RECEIVE").slice(0, 10).map((tx: any) => (
-                <div key={tx.id} className="flex justify-between items-center p-3 border border-gray-100 rounded-xl hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center shadow-sm ${
-                      tx.type === "RECEIVE" ? "bg-green-100 text-green-600" : "bg-blue-100 text-blue-600"
-                    }`}>
-                      {tx.type === "RECEIVE" ? <ArrowDownToLine className="w-4 h-4" /> : <Send className="w-4 h-4" />}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm text-gray-900">{tx.type}</p>
-                      <p className="text-xs text-gray-500 font-medium">{tx.asset}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`font-bold text-sm ${tx.type === "RECEIVE" ? "text-green-600" : "text-gray-900"}`}>
-                      {tx.type === "RECEIVE" ? "+" : "-"}{formatBalance(tx.amount)} {tx.asset}
-                    </p>
-                    <p className="text-xs text-gray-400 font-medium">{new Date(tx.createdAt).toLocaleDateString()}</p>
-                  </div>
-                </div>
-            ))}
-          </div>
-        </CardContent>
+            {renderTransactionHistory()}
+          </CardContent>
+        </Card>
       </Card>
       </div> {/* end grid */}
 
