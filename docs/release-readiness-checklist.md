@@ -13,6 +13,10 @@ If applicable for deployment flow:
 
 - `Post-Deploy Verify / Verify staging deployment`
 
+If governance-strict branch protection is enabled:
+
+- `Label Audit / Verify governance labels exist`
+
 ## 2) Security and dependency posture
 
 - `npm audit` has `0` high and `0` critical findings.

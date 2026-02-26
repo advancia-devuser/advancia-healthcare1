@@ -43,6 +43,7 @@ Test evidence (paste relevant output):
 
 - [ ] Ran `bash scripts/post-deploy-verify.sh https://<target-domain>`
 - [ ] Required checks green in CI (`CI Tests / Env validation tests`, `CI Tests / Unit/API tests (excluding env group)`, `Dependency Audit / npm audit (high/critical gate)`, `Docs Consistency / Validate docs/workflow sync`)
+- [ ] If governance-strict branch protection is enabled, `Label Audit / Verify governance labels exist` is green
 - [ ] If enabled, staging verification check green (`Post-Deploy Verify / Verify staging deployment`)
 
 ## Release sign-off (release PRs)
