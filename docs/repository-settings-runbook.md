@@ -19,6 +19,25 @@ Optional by environment/release flow:
 
 - `Post-Deploy Verify / Verify staging deployment`
 
+### Apply branch protection in ~60 seconds (UI)
+
+1. Open GitHub repo → `Settings` → `Branches`.
+2. Edit existing rule for `main` (or click `Add rule` with branch pattern `main`).
+3. Enable:
+	- `Require a pull request before merging`
+	- `Require approvals` (minimum `1`)
+	- `Require review from Code Owners`
+	- `Require status checks to pass before merging`
+	- `Require branches to be up to date before merging`
+	- `Require conversation resolution before merging`
+	- `Include administrators`
+4. Add required checks:
+	- `CI Tests / Env validation tests`
+	- `CI Tests / Unit/API tests (excluding env group)`
+	- `Dependency Audit / npm audit (high/critical gate)`
+	- `Docs Consistency / Validate docs/workflow sync`
+5. Save changes.
+
 ## 2) Required repository variables and secrets
 
 ### Required for post-deploy verification workflow
