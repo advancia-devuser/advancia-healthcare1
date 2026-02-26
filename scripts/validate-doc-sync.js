@@ -8,6 +8,9 @@ const mustExist = [
   ".github/workflows/dependency-audit.yml",
   ".github/workflows/post-deploy-verify.yml",
   ".github/dependabot.yml",
+  ".github/ISSUE_TEMPLATE/bug_report.yml",
+  ".github/ISSUE_TEMPLATE/security_report.yml",
+  ".github/ISSUE_TEMPLATE/change_request.yml",
   "docs/branch-protection.md",
   "docs/repository-settings-runbook.md",
   "docs/release-readiness-checklist.md",
@@ -45,6 +48,18 @@ const mustContain = [
       ".github/workflows/post-deploy-verify.yml",
       ".github/dependabot.yml",
     ],
+  },
+  {
+    file: ".github/ISSUE_TEMPLATE/bug_report.yml",
+    values: ["docs/label-glossary.md"],
+  },
+  {
+    file: ".github/ISSUE_TEMPLATE/security_report.yml",
+    values: ["docs/label-glossary.md"],
+  },
+  {
+    file: ".github/ISSUE_TEMPLATE/change_request.yml",
+    values: ["docs/label-glossary.md"],
   },
 ];
 

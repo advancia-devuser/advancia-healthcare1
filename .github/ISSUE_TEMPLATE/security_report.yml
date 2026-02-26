@@ -8,6 +8,8 @@ body:
       value: |
         Please avoid posting exploitable details publicly. Share only high-level information here and coordinate privately if needed.
 
+        Label guidance: use `docs/label-glossary.md` for consistent triage labels.
+
   - type: dropdown
     id: severity
     attributes:

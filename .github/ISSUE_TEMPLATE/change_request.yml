@@ -3,6 +3,11 @@ description: Propose an enhancement or workflow/process improvement
 title: "[Change]: "
 labels: ["enhancement"]
 body:
+  - type: markdown
+    attributes:
+      value: |
+        Label guidance: use `docs/label-glossary.md` for consistent triage labels.
+
   - type: textarea
     id: problem
     attributes:

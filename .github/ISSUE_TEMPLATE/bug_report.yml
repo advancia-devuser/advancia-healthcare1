@@ -8,6 +8,8 @@ body:
       value: |
         Thanks for reporting an issue. Please provide as much detail as possible.
 
+        Label guidance: use `docs/label-glossary.md` for consistent triage labels.
+
   - type: textarea
     id: summary
     attributes:
