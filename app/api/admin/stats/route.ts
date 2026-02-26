@@ -57,7 +57,7 @@ export async function GET() {
         paid: paidPaymentRequests,
       },
     });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ error: "Failed to fetch stats" }, { status: 500 });
   }
 }
