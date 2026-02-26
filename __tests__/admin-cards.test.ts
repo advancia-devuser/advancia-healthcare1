@@ -1,6 +1,7 @@
 import { GET, PATCH } from "@/app/api/admin/cards/route";
 import { isAdminRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { Prisma } from "@prisma/client";
 
 jest.mock("@/lib/auth", () => ({
   isAdminRequest: jest.fn(),
@@ -116,5 +117,29 @@ describe("Admin Cards API", () => {
         }),
       })
     );
+  });
+
+  test("PATCH returns 404 when card request does not exist", async () => {
+    const notFoundError = new Prisma.PrismaClientKnownRequestError(
+      "Record to update not found.",
+      {
+        code: "P2025",
+        clientVersion: "test",
+      }
+    );
+
+    (prisma.cardRequest.update as unknown as jest.Mock).mockRejectedValue(notFoundError);
+
+    const req = new Request("http://localhost:3000/api/admin/cards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: "missing-card", action: "REJECT" }),
+    });
+
+    const res = await PATCH(req);
+    expect(res.status).toBe(404);
+
+    const body = await res.json();
+    expect(body.error).toBe("Card request not found");
   });
 });
