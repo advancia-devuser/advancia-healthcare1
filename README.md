@@ -170,6 +170,7 @@ CI workflow:
 - File: `.github/workflows/ci-tests.yml`
 - Runs on push/PR
 - Splits `__tests__/env.test.ts` into its own job (`env-validation-tests`) and runs remaining tests in `unit-tests`
+- Dependency audit workflow: `.github/workflows/dependency-audit.yml` (weekly + manual + package manifest changes on `main`; blocks only on high/critical)
 - Branch protection setup guide: `docs/branch-protection.md`
 - Short PR description template: `docs/pr-description-short.md`
 - PR template: `.github/pull_request_template.md`

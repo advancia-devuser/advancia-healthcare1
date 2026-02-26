@@ -1,0 +1,41 @@
+name: Dependency Audit
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 9 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - package-lock.json
+
+jobs:
+  audit:
+    name: npm audit (high/critical gate)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run audit and save report
+        run: npm audit --json > audit-report.json || true
+
+      - name: Summarize vulnerabilities
+        run: |
+          node -e "const fs=require('fs');const j=JSON.parse(fs.readFileSync('audit-report.json','utf8'));const v=j.metadata?.vulnerabilities||{};const high=Number(v.high||0);const critical=Number(v.critical||0);const moderate=Number(v.moderate||0);const low=Number(v.low||0);const total=Number(v.total||0);const lines=[];lines.push('## npm audit summary');lines.push('');lines.push('| Severity | Count |');lines.push('|---|---:|');lines.push('| Critical | '+critical+' |');lines.push('| High | '+high+' |');lines.push('| Moderate | '+moderate+' |');lines.push('| Low | '+low+' |');lines.push('| Total | '+total+' |');fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, lines.join('\n')+'\n');if (critical>0 || high>0){console.error('Blocking: high/critical vulnerabilities detected.');process.exit(1);}"
+
+      - name: Upload audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: audit-report.json
