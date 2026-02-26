@@ -46,7 +46,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const body: unknown = await request.json();
+    const body: unknown = await request.json().catch(() => null);
 
     if (!body || typeof body !== "object") {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
@@ -67,7 +67,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const numericAmount = Number(String(amount));
+    const normalizedAmount = String(amount).trim();
+    const numericAmount = Number(normalizedAmount);
     if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
       return NextResponse.json(
         { error: "amount must be a positive number" },
@@ -108,7 +109,7 @@ export async function POST(request: Request) {
     const withdrawal = await prisma.withdrawal.create({
       data: {
         userId: user.id,
-        amount: String(amount),
+        amount: normalizedAmount,
         asset: typeof asset === "string" ? asset.trim() : "ETH",
         toAddress: toAddress.trim(),
         chainId: parsedChainId,
@@ -120,7 +121,7 @@ export async function POST(request: Request) {
         userId: user.id,
         actor: user.address,
         action: "WITHDRAWAL_REQUESTED",
-        meta: JSON.stringify({ amount: String(amount), asset: typeof asset === "string" ? asset.trim() : "ETH", toAddress: toAddress.trim(), chainId: parsedChainId }),
+        meta: JSON.stringify({ amount: normalizedAmount, asset: typeof asset === "string" ? asset.trim() : "ETH", toAddress: toAddress.trim(), chainId: parsedChainId }),
       },
     });
 
