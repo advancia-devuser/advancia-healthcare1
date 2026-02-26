@@ -176,6 +176,29 @@ CI workflow:
 - Issue templates: `.github/ISSUE_TEMPLATE/` (bug, security, change request)
 - CODEOWNERS: `.github/CODEOWNERS`
 
+### Dependency risk tracking (upstream)
+
+As of 2026-02-26 (`npm audit`):
+
+- `0` critical
+- `0` high
+- `6` moderate (all transitive and currently `fixAvailable: false`)
+
+Current unresolved moderate packages:
+
+- `@account-kit/react`
+- `@solana/wallet-adapter-walletconnect`
+- `@solana/wallet-adapter-wallets`
+- `@walletconnect/solana-adapter`
+- `@walletconnect/universal-provider`
+- `lodash` (via walletconnect transitive chain)
+
+Operational policy:
+
+- Keep `@account-kit/*` on latest compatible versions.
+- Recheck with `npm audit` on each dependency update PR.
+- Remove this tracking note once upstream publishes fixable versions and the moderates clear.
+
 ## 🛂 License
 
 MIT
