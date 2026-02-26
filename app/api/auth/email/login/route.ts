@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { signUserToken, checkRateLimit, getClientIP } from "@/lib/auth";
+import { signUserToken, checkRateLimitPersistent, getClientIP } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 
@@ -12,7 +12,7 @@ import { cookies } from "next/headers";
 export async function POST(request: Request) {
   try {
     const ip = getClientIP(request);
-    if (!checkRateLimit(`email-login:${ip}`, 10, 60_000)) {
+    if (!(await checkRateLimitPersistent(`email-login:${ip}`, 10, 60_000))) {
       return NextResponse.json({ error: "Too many attempts. Try later." }, { status: 429 });
     }
 

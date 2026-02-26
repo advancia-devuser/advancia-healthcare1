@@ -95,6 +95,87 @@ npm run start   # run production build
 npm run lint    # lint code
 ```
 
+## 🔐 Production security notes
+
+- Set `ADMIN_PASSWORD_HASH` (bcrypt hash) for admin login. Plain `ADMIN_PASSWORD` is only a non-production fallback.
+- Generate hash with:
+
+```bash
+npm run hash:admin -- 'your-strong-admin-password'
+```
+
+- Set `REDIS_REST_URL` and `REDIS_REST_TOKEN` to enable persistent rate limiting, nonce storage, and admin lockout state across instances.
+- `REDIS_REST_URL` and `REDIS_REST_TOKEN` are validated as a pair (both required together; partial config fails in production).
+- Keep `ADMIN_JWT_SECRET` and `USER_JWT_SECRET` strong and unique per environment.
+- See `.env.example` for complete variable descriptions.
+
+Post-deploy verification:
+
+```bash
+bash scripts/post-deploy-verify.sh https://your-domain.com
+```
+
+Optional admin positive-path validation:
+
+```bash
+ADMIN_PASSWORD='your-admin-password' ADMIN_TOTP='123456' bash scripts/post-deploy-verify.sh https://your-domain.com
+```
+
+GitHub Actions workflow:
+
+- File: `.github/workflows/post-deploy-verify.yml`
+- Trigger manually via `workflow_dispatch` or by `repository_dispatch` event type `post_deploy_verify`
+- Required repo variable/secret: `STAGING_URL`
+- Optional secrets for admin success-path check: `STAGING_ADMIN_PASSWORD`, `STAGING_ADMIN_TOTP`
+
+Trigger `repository_dispatch` from terminal:
+
+```bash
+curl -X POST "https://api.github.com/repos/advancia-devuser/advancia-healthcare1/dispatches" -H "Accept: application/vnd.github+json" -H "Authorization: Bearer <GITHUB_TOKEN_WITH_REPO_SCOPE>" -d '{"event_type":"post_deploy_verify"}'
+```
+
+PowerShell equivalent:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri "https://api.github.com/repos/advancia-devuser/advancia-healthcare1/dispatches" -Headers @{ Accept = "application/vnd.github+json"; Authorization = "Bearer <GITHUB_TOKEN_WITH_REPO_SCOPE>" } -Body '{"event_type":"post_deploy_verify"}'
+```
+
+Helper scripts (recommended):
+
+```bash
+GITHUB_TOKEN=<GITHUB_TOKEN_WITH_REPO_SCOPE> npm run trigger:post-deploy:dispatch
+```
+
+Dry-run preview (no API call):
+
+```bash
+bash scripts/trigger-post-deploy-verify.sh advancia-devuser advancia-healthcare1 post_deploy_verify --dry-run
+```
+
+```powershell
+$env:GITHUB_TOKEN = "<GITHUB_TOKEN_WITH_REPO_SCOPE>"
+npm run trigger:post-deploy:dispatch:ps
+```
+
+Test note: bash helper validation is enforced in Linux CI, while Windows environments validate the PowerShell helper path.
+
+PowerShell dry-run preview:
+
+```powershell
+pwsh -File scripts/trigger-post-deploy-verify.ps1 -DryRun
+```
+
+CI workflow:
+
+- File: `.github/workflows/ci-tests.yml`
+- Runs on push/PR
+- Splits `__tests__/env.test.ts` into its own job (`env-validation-tests`) and runs remaining tests in `unit-tests`
+- Branch protection setup guide: `docs/branch-protection.md`
+- Short PR description template: `docs/pr-description-short.md`
+- PR template: `.github/pull_request_template.md`
+- Issue templates: `.github/ISSUE_TEMPLATE/` (bug, security, change request)
+- CODEOWNERS: `.github/CODEOWNERS`
+
 ## 🛂 License
 
 MIT

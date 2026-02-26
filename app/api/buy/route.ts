@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser, checkRateLimit, getClientIP } from "@/lib/auth";
+import { getAuthUser, checkRateLimitPersistent, getClientIP } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { generateWidgetUrl, PROVIDERS } from "@/lib/onramp-providers";
 import type { OnRampProvider } from "@/lib/onramp-providers";
@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 /* ─── POST: Create buy order ─── */
 export async function POST(req: NextRequest) {
   const ip = getClientIP(req);
-  if (!checkRateLimit(`buy:${ip}`, 10, 60_000)) {
+  if (!(await checkRateLimitPersistent(`buy:${ip}`, 10, 60_000))) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 

@@ -1,0 +1,27 @@
+# Default owner
+* @advancia-devuser
+
+# Security / auth critical paths
+lib/auth.ts @advancia-devuser
+lib/env.ts @advancia-devuser
+lib/crypto.ts @advancia-devuser
+app/api/auth/** @advancia-devuser
+app/api/admin/** @advancia-devuser
+
+# Data layer
+prisma/** @advancia-devuser
+lib/db.ts @advancia-devuser
+lib/ledger.ts @advancia-devuser
+
+# CI/CD and repo governance
+.github/workflows/** @advancia-devuser
+.github/pull_request_template.md @advancia-devuser
+.github/ISSUE_TEMPLATE/** @advancia-devuser
+docs/branch-protection.md @advancia-devuser
+
+# Operational scripts
+scripts/** @advancia-devuser
+
+# Frontend app and components
+app/** @advancia-devuser
+components/** @advancia-devuser

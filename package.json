@@ -8,6 +8,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "hash:admin": "node scripts/generate-admin-password-hash.js",
+    "trigger:post-deploy:dispatch": "bash scripts/trigger-post-deploy-verify.sh",
+    "trigger:post-deploy:dispatch:ps": "pwsh -File scripts/trigger-post-deploy-verify.ps1",
     "test": "jest --config jest.config.cjs --runInBand",
     "test:e2e": "jest --config jest.config.cjs --runInBand --testPathPattern=e2e",
     "postinstall": "node scripts/postinstall.js"

@@ -1,6 +1,6 @@
 import { POST } from "@/app/api/auth/verify-email/route";
 import { prisma } from "@/lib/db";
-import { getAuthUser, checkRateLimit, getClientIP } from "@/lib/auth";
+import { getAuthUser, checkRateLimitPersistent, getClientIP } from "@/lib/auth";
 import { sendVerificationEmail } from "@/lib/email";
 
 jest.mock("@/lib/db", () => ({
@@ -19,7 +19,7 @@ jest.mock("@/lib/db", () => ({
 
 jest.mock("@/lib/auth", () => ({
   getAuthUser: jest.fn(),
-  checkRateLimit: jest.fn(() => true),
+  checkRateLimitPersistent: jest.fn(async () => true),
   getClientIP: jest.fn(() => "1.2.3.4"),
 }));
 
@@ -30,7 +30,7 @@ jest.mock("@/lib/email", () => ({
 describe("Email Verification API", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (checkRateLimit as unknown as jest.Mock).mockReturnValue(true);
+    (checkRateLimitPersistent as unknown as jest.Mock).mockResolvedValue(true);
     (getClientIP as unknown as jest.Mock).mockReturnValue("1.2.3.4");
   });
 

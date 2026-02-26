@@ -1,0 +1,42 @@
+name: Post-Deploy Verify
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [post_deploy_verify]
+
+jobs:
+  verify-staging:
+    name: Verify staging deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve target URL
+        id: target
+        env:
+          STAGING_URL_VAR: ${{ vars.STAGING_URL }}
+          STAGING_URL_SECRET: ${{ secrets.STAGING_URL }}
+        run: |
+          URL="${STAGING_URL_VAR:-}"
+          if [ -z "$URL" ]; then
+            URL="${STAGING_URL_SECRET:-}"
+          fi
+
+          if [ -z "$URL" ]; then
+            echo "STAGING_URL is not set in repo variables or secrets"
+            exit 1
+          fi
+
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Using target: $URL"
+
+      - name: Run post-deploy verification
+        env:
+          ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
+          ADMIN_TOTP: ${{ secrets.STAGING_ADMIN_TOTP }}
+        run: |
+          chmod +x scripts/post-deploy-verify.sh
+          bash scripts/post-deploy-verify.sh "${{ steps.target.outputs.url }}"

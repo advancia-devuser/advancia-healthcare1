@@ -11,12 +11,16 @@
 
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { resolveUser, signUserToken, checkRateLimit, getClientIP } from "@/lib/auth";
+import {
+  resolveUser,
+  signUserToken,
+  checkRateLimitPersistent,
+  getClientIP,
+  storeAuthNonce,
+  consumeAuthNonce,
+} from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { verifyMessage } from "viem";
-
-/* In-memory nonce store (production: use Redis/DB) */
-const nonceStore = new Map<string, { nonce: string; expiresAt: number }>();
 
 function generateNonce(): string {
   const array = new Uint8Array(32);
@@ -35,7 +39,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "address query param required" }, { status: 400 });
   }
   const nonce = generateNonce();
-  nonceStore.set(address, { nonce, expiresAt: Date.now() + 5 * 60_000 }); // 5 min TTL
+  await storeAuthNonce(address, nonce, 5 * 60_000);
   return NextResponse.json({
     nonce,
     message: `Sign this message to verify your wallet ownership.\n\nNonce: ${nonce}`,
@@ -50,7 +54,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const ip = getClientIP(request);
-    if (!checkRateLimit(`session:${ip}`, 10, 60_000)) {
+    if (!(await checkRateLimitPersistent(`session:${ip}`, 10, 60_000))) {
       return NextResponse.json({ error: "Too many attempts. Try later." }, { status: 429 });
     }
 
@@ -62,17 +66,14 @@ export async function POST(request: Request) {
 
     const lower = address.toLowerCase();
 
-    // Verify nonce exists and is not expired
-    const stored = nonceStore.get(lower);
-    if (!stored || stored.nonce !== nonce || Date.now() > stored.expiresAt) {
+    // Verify and consume one-time nonce
+    const storedNonce = await consumeAuthNonce(lower);
+    if (!storedNonce || storedNonce !== nonce) {
       return NextResponse.json(
         { error: "Invalid or expired nonce. Request a new one via GET." },
         { status: 401 }
       );
     }
-
-    // Consume nonce (one-time use)
-    nonceStore.delete(lower);
 
     // Verify signature (EIP-191 personal sign)
     const message = `Sign this message to verify your wallet ownership.\n\nNonce: ${nonce}`;

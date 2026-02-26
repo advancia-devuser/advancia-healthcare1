@@ -10,7 +10,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { requireApprovedUser, checkRateLimit, getClientIP } from "@/lib/auth";
+import { requireApprovedUser, checkRateLimitPersistent, getClientIP } from "@/lib/auth";
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
 
 const SALT_LENGTH = 16;
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
 
     // Rate limit PIN attempts (5 per minute)
     const ip = getClientIP(request);
-    if (!checkRateLimit(`pin:${user.id}:${ip}`, 5, 60_000)) {
+    if (!(await checkRateLimitPersistent(`pin:${user.id}:${ip}`, 5, 60_000))) {
       return NextResponse.json(
         { error: "Too many attempts. Try again in a minute." },
         { status: 429 }

@@ -10,7 +10,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getAuthUser, checkRateLimit, getClientIP } from "@/lib/auth";
+import { getAuthUser, checkRateLimitPersistent, getClientIP } from "@/lib/auth";
 import { randomBytes } from "crypto";
 import { sendVerificationEmail } from "@/lib/email";
 
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
     /* ─── SEND: Generate verification token ─── */
     if (action === "send") {
-      if (!checkRateLimit(`email-send:${user.id}`, 3, 10 * 60_000)) {
+      if (!(await checkRateLimitPersistent(`email-send:${user.id}`, 3, 10 * 60_000))) {
         return NextResponse.json(
           { error: "Too many requests. Try again later." },
           { status: 429 }
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
 
     /* ─── VERIFY: Confirm the token ─── */
     if (action === "verify") {
-      if (!checkRateLimit(`email-verify:${user.id}:${ip}`, 5, 60_000)) {
+      if (!(await checkRateLimitPersistent(`email-verify:${user.id}:${ip}`, 5, 60_000))) {
         return NextResponse.json(
           { error: "Too many attempts. Try again in a minute." },
           { status: 429 }

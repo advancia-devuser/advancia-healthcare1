@@ -1,0 +1,77 @@
+name: Security Report
+description: Report a security vulnerability or abuse risk
+title: "[Security]: "
+labels: ["security"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please avoid posting exploitable details publicly. Share only high-level information here and coordinate privately if needed.
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Estimated severity
+      options:
+        - critical
+        - high
+        - medium
+        - low
+    validations:
+      required: true
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      options:
+        - authentication/session
+        - authorization/access-control
+        - rate-limiting/abuse prevention
+        - secrets/configuration
+        - data privacy/encryption
+        - infrastructure/deployment
+        - other
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: High-level description of the security issue.
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact
+      description: What could an attacker do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction (safe details)
+      description: Include minimal steps without harmful payloads.
+
+  - type: textarea
+    id: mitigation
+    attributes:
+      label: Suggested mitigation
+
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: staging/prod + endpoint/path
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Confirmation
+      options:
+        - label: I have redacted all secrets and sensitive personal data
+          required: true

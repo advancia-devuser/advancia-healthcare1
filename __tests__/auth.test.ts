@@ -10,6 +10,7 @@ import {
   signAdminToken,
   verifyAdminToken,
   checkRateLimit,
+  checkRateLimitPersistent,
 } from "@/lib/auth";
 
 describe("User JWT", () => {
@@ -76,5 +77,19 @@ describe("Rate Limiter", () => {
     checkRateLimit(key1, 1, 10_000);
     expect(checkRateLimit(key1, 1, 10_000)).toBe(false);
     expect(checkRateLimit(key2, 1, 10_000)).toBe(true);
+  });
+
+  test("persistent limiter allows requests within limit", async () => {
+    const key = "test-persistent-rate-" + Date.now();
+    await expect(checkRateLimitPersistent(key, 3, 10_000)).resolves.toBe(true);
+    await expect(checkRateLimitPersistent(key, 3, 10_000)).resolves.toBe(true);
+    await expect(checkRateLimitPersistent(key, 3, 10_000)).resolves.toBe(true);
+  });
+
+  test("persistent limiter blocks requests exceeding limit", async () => {
+    const key = "test-persistent-block-" + Date.now();
+    await checkRateLimitPersistent(key, 2, 10_000);
+    await checkRateLimitPersistent(key, 2, 10_000);
+    await expect(checkRateLimitPersistent(key, 2, 10_000)).resolves.toBe(false);
   });
 });
