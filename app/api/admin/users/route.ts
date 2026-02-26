@@ -3,6 +3,33 @@ import { isAdminRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { sendAccountStatusEmail } from "@/lib/email";
 import { sendAccountStatusSms } from "@/lib/sms";
+import { Prisma, UserStatus } from "@prisma/client";
+
+const USER_STATUS_VALUES = new Set<UserStatus>([
+  UserStatus.PENDING,
+  UserStatus.APPROVED,
+  UserStatus.REJECTED,
+  UserStatus.SUSPENDED,
+]);
+
+type AdminUserAction = "APPROVE" | "REJECT" | "SUSPEND" | "UNSUSPEND";
+type AccountNotificationStatus = "APPROVED" | "REJECTED" | "SUSPENDED" | "RESTORED";
+
+function parsePositiveInt(value: string | null, fallback: number): number {
+  const parsed = Number.parseInt(value || "", 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function isUserStatus(value: unknown): value is UserStatus {
+  return typeof value === "string" && USER_STATUS_VALUES.has(value as UserStatus);
+}
+
+function isAdminUserAction(value: unknown): value is AdminUserAction {
+  return value === "APPROVE" || value === "REJECT" || value === "SUSPEND" || value === "UNSUSPEND";
+}
 
 /**
  * GET /api/admin/users?status=PENDING&search=...&page=1&limit=20
@@ -13,19 +40,29 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { searchParams } = new URL(request.url);
-  const status = searchParams.get("status") || undefined;
-  const search = searchParams.get("search") || undefined;
-  const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-  const limit = Math.min(100, parseInt(searchParams.get("limit") || "20"));
-
   try {
-    const where: any = {};
+    const { searchParams } = new URL(request.url);
+    const rawStatus = searchParams.get("status");
+    const candidateStatus = rawStatus ? rawStatus.trim().toUpperCase() : undefined;
+    if (candidateStatus && !isUserStatus(candidateStatus)) {
+      return NextResponse.json(
+        { error: "Invalid status. Allowed values: PENDING, APPROVED, REJECTED, SUSPENDED" },
+        { status: 400 }
+      );
+    }
+
+    const status: UserStatus | undefined =
+      candidateStatus && isUserStatus(candidateStatus) ? candidateStatus : undefined;
+    const searchValue = searchParams.get("search")?.trim() || undefined;
+    const page = parsePositiveInt(searchParams.get("page"), 1);
+    const limit = Math.min(100, parsePositiveInt(searchParams.get("limit"), 20));
+
+    const where: Prisma.UserWhereInput = {};
     if (status) where.status = status;
-    if (search) {
+    if (searchValue) {
       where.OR = [
-        { address: { contains: search } },
-        { email: { contains: search } },
+        { address: { contains: searchValue } },
+        { email: { contains: searchValue } },
       ];
     }
 
@@ -41,7 +78,7 @@ export async function GET(request: Request) {
     ]);
 
     return NextResponse.json({ users, total, page, limit });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 });
   }
 }
@@ -56,29 +93,46 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const { userId, action } = await request.json();
-    if (!userId || !action) {
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const { userId, action } = body as { userId?: unknown; action?: unknown };
+    if (typeof userId !== "string" || !userId.trim()) {
       return NextResponse.json(
-        { error: "userId and action are required" },
+        { error: "userId is required" },
         { status: 400 }
       );
     }
 
-    const statusMap: Record<string, string> = {
+    if (!isAdminUserAction(action)) {
+      return NextResponse.json(
+        { error: "Invalid action. Allowed values: APPROVE, REJECT, SUSPEND, UNSUSPEND" },
+        { status: 400 }
+      );
+    }
+
+    const statusMap: Record<AdminUserAction, UserStatus> = {
+      APPROVE: UserStatus.APPROVED,
+      REJECT: UserStatus.REJECTED,
+      SUSPEND: UserStatus.SUSPENDED,
+      UNSUSPEND: UserStatus.APPROVED,
+    };
+
+    const notificationStatusMap: Record<AdminUserAction, AccountNotificationStatus> = {
       APPROVE: "APPROVED",
       REJECT: "REJECTED",
       SUSPEND: "SUSPENDED",
-      UNSUSPEND: "APPROVED",
+      UNSUSPEND: "RESTORED",
     };
 
     const newStatus = statusMap[action];
-    if (!newStatus) {
-      return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-    }
+    const notificationStatus = notificationStatusMap[action];
 
     const user = await prisma.user.update({
-      where: { id: userId },
-      data: { status: newStatus as any },
+      where: { id: userId.trim() },
+      data: { status: newStatus },
     });
 
     // Create notification for the user
@@ -111,16 +165,14 @@ export async function PATCH(request: Request) {
 
       // Send email notification if user has an email
       if (user.email) {
-        const emailStatus = action === "UNSUSPEND" ? "RESTORED" : action === "APPROVE" ? "APPROVED" : action === "REJECT" ? "REJECTED" : "SUSPENDED";
-        sendAccountStatusEmail(user.email, emailStatus as any).catch((err) =>
+        sendAccountStatusEmail(user.email, notificationStatus).catch((err) =>
           console.error("[EMAIL] Failed to send account status email:", err)
         );
       }
 
       // Send SMS notification if user has a phone number
       if (user.phone) {
-        const smsStatus = action === "UNSUSPEND" ? "RESTORED" : action === "APPROVE" ? "APPROVED" : action === "REJECT" ? "REJECTED" : "SUSPENDED";
-        sendAccountStatusSms(user.phone, smsStatus as any).catch((err) =>
+        sendAccountStatusSms(user.phone, notificationStatus).catch((err) =>
           console.error("[SMS] Failed to send account status SMS:", err)
         );
       }
@@ -137,7 +189,11 @@ export async function PATCH(request: Request) {
     });
 
     return NextResponse.json({ user });
-  } catch (err: any) {
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
   }
 }
