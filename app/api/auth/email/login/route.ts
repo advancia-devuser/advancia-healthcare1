@@ -4,6 +4,25 @@ import { signUserToken, checkRateLimitPersistent, getClientIP } from "@/lib/auth
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 
+function normalizeEmail(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    return null;
+  }
+  return normalized;
+}
+
+function normalizePassword(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized ? normalized : null;
+}
+
 /**
  * POST /api/auth/email/login
  * Body: { email: string, password: string }
@@ -16,18 +35,29 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Too many attempts. Try later." }, { status: 429 });
     }
 
-    const { email, password } = await request.json();
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    if (!email || typeof email !== "string") {
+    const { email, password } = body as {
+      email?: unknown;
+      password?: unknown;
+    };
+
+    const normalizedEmail = normalizeEmail(email);
+    const normalizedPassword = normalizePassword(password);
+
+    if (!normalizedEmail) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
-    if (!password || typeof password !== "string") {
+    if (!normalizedPassword) {
       return NextResponse.json({ error: "Password is required" }, { status: 400 });
     }
 
     // Find user by email
     const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: normalizedEmail },
     });
 
     if (!user || !user.password) {
@@ -35,7 +65,7 @@ export async function POST(request: Request) {
     }
 
     // Compare password
-    const isValid = await bcrypt.compare(password, user.password);
+    const isValid = await bcrypt.compare(normalizedPassword, user.password);
     if (!isValid) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
@@ -60,8 +90,8 @@ export async function POST(request: Request) {
         status: user.status,
       },
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[Email Login]", err);
-    return NextResponse.json({ error: err.message || "Login failed" }, { status: 500 });
+    return NextResponse.json({ error: "Login failed" }, { status: 500 });
   }
 }
