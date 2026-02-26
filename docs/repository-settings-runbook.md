@@ -52,11 +52,13 @@ Optional for governance-strict repos:
 2. Open `Secrets and variables` → `Actions`.
 3. In **Variables**, verify at least one staging target is present:
 	- `STAGING_URL`
-4. In **Secrets**, verify either `STAGING_URL` exists or the variable above is set.
-5. In **Secrets**, verify optional admin checks if used:
+4. In **Variables**, optionally set strict label metadata enforcement:
+	- `LABEL_AUDIT_FAIL_ON_DRIFT` = `true` (or leave unset/`false` for warning-only drift reporting)
+5. In **Secrets**, verify either `STAGING_URL` exists or the variable above is set.
+6. In **Secrets**, verify optional admin checks if used:
 	- `STAGING_ADMIN_PASSWORD`
 	- `STAGING_ADMIN_TOTP`
-6. Save any missing values, then run `Post-Deploy Verify` via `workflow_dispatch`.
+7. Save any missing values, then run `Post-Deploy Verify` via `workflow_dispatch`.
 
 ### Required for post-deploy verification workflow
 
@@ -71,6 +73,10 @@ Optional (enables admin positive-path checks in the same workflow):
 
 - Repository secret: `STAGING_ADMIN_PASSWORD`
 - Repository secret: `STAGING_ADMIN_TOTP`
+
+Optional (strict governance metadata enforcement in `.github/workflows/label-audit.yml`):
+
+- Repository variable: `LABEL_AUDIT_FAIL_ON_DRIFT=true`
 
 ### Required for local/runtime app deployment
 
@@ -112,6 +118,7 @@ Feature-dependent variables (set only if feature is enabled):
 - Enable branch protection for `main` using `docs/branch-protection.md`
 - Add `STAGING_URL` (variable or secret)
 - Optionally add `STAGING_ADMIN_PASSWORD` and `STAGING_ADMIN_TOTP`
+- Optionally set `LABEL_AUDIT_FAIL_ON_DRIFT=true` for fail-on-drift governance mode
 - Confirm Actions are enabled and workflows can run
 - Trigger `Dependency Audit` via `workflow_dispatch` once to validate setup
 - Trigger `Post-Deploy Verify` via `workflow_dispatch` once with staging URL configured
