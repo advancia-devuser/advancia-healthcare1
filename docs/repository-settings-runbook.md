@@ -148,6 +148,7 @@ Feature-dependent variables (set only if feature is enabled):
 - For manual reminder checks, run `.github/workflows/triage-reminder.yml` with optional `workflow_dispatch` inputs: `issue_number` (target one issue) and `hours_threshold` (default `24`)
 - Ensure `.github/workflows/triage-auto-clear.yml` can remove `needs-triage` once owner + risk + domain labels are set (domain examples: `bug`, `enhancement`, `security`, `dependencies`, `ci`, `docs`, `release`)
 - For manual remediation, run `.github/workflows/triage-auto-clear.yml` with `workflow_dispatch` input `issue_number` to evaluate a specific issue on demand
+  - Command example: `gh workflow run triage-auto-clear.yml --repo advancia-devuser/advancia-healthcare1 -f issue_number=123`
 - Keep `.github/workflows/label-audit.yml` enabled for `pull_request` and `push` to `main`, and use monthly/manual runs for periodic governance audits
 
 ## 6) Troubleshooting (common failures)
