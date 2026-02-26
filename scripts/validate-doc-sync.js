@@ -65,6 +65,10 @@ const mustContain = [
     values: ["LABEL_AUDIT_FAIL_ON_DRIFT", "Label Audit / Verify governance labels exist"],
   },
   {
+    file: "docs/release-readiness-checklist.md",
+    values: ["LABEL_AUDIT_FAIL_ON_DRIFT", "Label Audit / Verify governance labels exist"],
+  },
+  {
     file: ".github/pull_request_template.md",
     values: ["LABEL_AUDIT_FAIL_ON_DRIFT", "Label Audit / Verify governance labels exist"],
   },
