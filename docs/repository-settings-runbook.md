@@ -112,3 +112,29 @@ Feature-dependent variables (set only if feature is enabled):
 - Keep Dependabot PRs enabled and review weekly batch updates
 - Treat high/critical dependency findings as merge blockers
 - Revisit unresolved moderate advisories when upstream fixable versions are released
+
+## 6) Troubleshooting (common failures)
+
+### `Post-Deploy Verify / Verify staging deployment` fails immediately
+
+- Symptom: workflow logs contain `STAGING_URL is not set in repo variables or secrets`.
+- Likely cause: neither Actions variable nor secret `STAGING_URL` is configured.
+- Fix: add `STAGING_URL` in `Settings` → `Secrets and variables` → `Actions`, then rerun.
+
+### Branch protection blocks merge with missing required checks
+
+- Symptom: PR shows one or more required checks as `Expected — Waiting for status to be reported`.
+- Likely cause: required check name in branch rule does not exactly match workflow/job check name.
+- Fix: copy exact names from `docs/branch-protection.md` and update branch rule required checks.
+
+### `Dependency Audit / npm audit (high/critical gate)` fails
+
+- Symptom: audit summary reports `high` or `critical` > `0`.
+- Likely cause: newly introduced vulnerable dependency path.
+- Fix: update direct dependencies first, then use safe `overrides` if needed; rerun audit and tests before merge.
+
+### `Docs Consistency / Validate docs/workflow sync` fails
+
+- Symptom: checker reports missing references or missing required files.
+- Likely cause: docs/workflow file moved, renamed, or referenced path not updated.
+- Fix: update docs links and required references, then run `npm run check:docs-sync` locally.
