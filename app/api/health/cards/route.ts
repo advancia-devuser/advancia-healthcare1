@@ -12,6 +12,67 @@ import { prisma } from "@/lib/db";
 import { requireApprovedUser } from "@/lib/auth";
 import { encryptJSON, decryptJSON } from "@/lib/crypto";
 
+const VALID_CARD_TYPES = ["INSURANCE", "VACCINATION", "PRESCRIPTION"] as const;
+const VALID_CARD_STATUSES = ["ACTIVE", "EXPIRED", "INACTIVE"] as const;
+
+type CardType = (typeof VALID_CARD_TYPES)[number];
+type CardStatus = (typeof VALID_CARD_STATUSES)[number];
+
+function normalizeNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized || null;
+}
+
+function normalizeCardType(value: unknown): CardType | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toUpperCase();
+  return VALID_CARD_TYPES.includes(normalized as CardType) ? (normalized as CardType) : null;
+}
+
+function normalizeCardStatus(value: unknown): CardStatus | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toUpperCase();
+  return VALID_CARD_STATUSES.includes(normalized as CardStatus)
+    ? (normalized as CardStatus)
+    : null;
+}
+
+function parseOptionalDate(value: unknown): Date | null | undefined {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) {
+    return undefined;
+  }
+  return parsed;
+}
+
+function parseCardData(value: unknown): Record<string, unknown> | null {
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value) as unknown;
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return null;
+      }
+      return parsed as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+  return value as Record<string, unknown>;
+}
+
 /* ─── GET — List user health cards ─── */
 export async function GET(request: Request) {
   try {
@@ -21,9 +82,25 @@ export async function GET(request: Request) {
     const status = searchParams.get("status"); // ACTIVE, EXPIRED, INACTIVE
     const cardType = searchParams.get("cardType"); // INSURANCE, VACCINATION, PRESCRIPTION
 
+    const normalizedStatus = status ? normalizeCardStatus(status) : null;
+    const normalizedCardType = cardType ? normalizeCardType(cardType) : null;
+
+    if (status && !normalizedStatus) {
+      return NextResponse.json(
+        { error: `Invalid status. Must be one of: ${VALID_CARD_STATUSES.join(", ")}` },
+        { status: 400 }
+      );
+    }
+    if (cardType && !normalizedCardType) {
+      return NextResponse.json(
+        { error: `Invalid cardType. Must be one of: ${VALID_CARD_TYPES.join(", ")}` },
+        { status: 400 }
+      );
+    }
+
     const where: Record<string, unknown> = { userId: user.id };
-    if (status) where.status = status;
-    if (cardType) where.cardType = cardType;
+    if (normalizedStatus) where.status = normalizedStatus;
+    if (normalizedCardType) where.cardType = normalizedCardType;
 
     const cards = await prisma.healthCard.findMany({
       where,
@@ -72,37 +149,47 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const body = await request.json();
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    const { providerName, cardType, cardData, expiresAt } = body;
+    const { providerName, cardType, cardData, expiresAt } = body as {
+      providerName?: unknown;
+      cardType?: unknown;
+      cardData?: unknown;
+      expiresAt?: unknown;
+    };
 
-    if (!providerName || !cardType || !cardData) {
+    const normalizedProviderName = normalizeNonEmptyString(providerName);
+    const normalizedCardType = normalizeCardType(cardType);
+    const parsedCardData = parseCardData(cardData);
+    const parsedExpiresAt = parseOptionalDate(expiresAt);
+
+    if (!normalizedProviderName || !normalizedCardType || !parsedCardData) {
       return NextResponse.json(
         { error: "providerName, cardType, and cardData are required" },
         { status: 400 }
       );
     }
 
-    const validCardTypes = ["INSURANCE", "VACCINATION", "PRESCRIPTION"];
-    if (!validCardTypes.includes(cardType)) {
+    if (parsedExpiresAt === undefined) {
       return NextResponse.json(
-        { error: `Invalid cardType. Must be one of: ${validCardTypes.join(", ")}` },
+        { error: "expiresAt must be a valid date when provided" },
         { status: 400 }
       );
     }
 
     // Encrypt the card data (JSON object with policy number, member ID, etc.)
-    const encryptedData = encryptJSON(
-      typeof cardData === "string" ? JSON.parse(cardData) : cardData
-    );
+    const encryptedData = encryptJSON(parsedCardData);
 
     const card = await prisma.healthCard.create({
       data: {
         userId: user.id,
-        providerName,
-        cardType,
+        providerName: normalizedProviderName,
+        cardType: normalizedCardType,
         encryptedData,
-        expiresAt: expiresAt ? new Date(expiresAt) : null,
+        expiresAt: parsedExpiresAt,
       },
     });
 
@@ -114,8 +201,8 @@ export async function POST(request: Request) {
         action: "HEALTH_CARD_ADDED",
         meta: JSON.stringify({
           cardId: card.id,
-          providerName,
-          cardType,
+          providerName: normalizedProviderName,
+          cardType: normalizedCardType,
         }),
       },
     });
@@ -125,7 +212,7 @@ export async function POST(request: Request) {
       data: {
         userId: user.id,
         title: "Health Card Added",
-        body: `Your ${cardType.toLowerCase()} card from ${providerName} has been securely stored.`,
+        body: `Your ${normalizedCardType.toLowerCase()} card from ${normalizedProviderName} has been securely stored.`,
         channel: "IN_APP",
       },
     });
@@ -154,11 +241,22 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const body = await request.json();
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    const { cardId, providerName, cardData, status, expiresAt } = body;
+    const { cardId, providerName, cardData, status, expiresAt } = body as {
+      cardId?: unknown;
+      providerName?: unknown;
+      cardData?: unknown;
+      status?: unknown;
+      expiresAt?: unknown;
+    };
 
-    if (!cardId) {
+    const normalizedCardId = normalizeNonEmptyString(cardId);
+
+    if (!normalizedCardId) {
       return NextResponse.json(
         { error: "cardId is required" },
         { status: 400 }
@@ -167,7 +265,7 @@ export async function PATCH(request: Request) {
 
     // Verify ownership
     const existing = await prisma.healthCard.findFirst({
-      where: { id: cardId, userId: user.id },
+      where: { id: normalizedCardId, userId: user.id },
     });
 
     if (!existing) {
@@ -178,26 +276,59 @@ export async function PATCH(request: Request) {
     }
 
     const updateData: Record<string, unknown> = {};
-    if (providerName) updateData.providerName = providerName;
-    if (status) {
-      const validStatuses = ["ACTIVE", "EXPIRED", "INACTIVE"];
-      if (!validStatuses.includes(status)) {
+    if (providerName !== undefined) {
+      const normalizedProviderName = normalizeNonEmptyString(providerName);
+      if (!normalizedProviderName) {
         return NextResponse.json(
-          { error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` },
+          { error: "providerName must be a non-empty string when provided" },
           { status: 400 }
         );
       }
-      updateData.status = status;
+      updateData.providerName = normalizedProviderName;
     }
-    if (expiresAt) updateData.expiresAt = new Date(expiresAt);
-    if (cardData) {
-      updateData.encryptedData = encryptJSON(
-        typeof cardData === "string" ? JSON.parse(cardData) : cardData
+
+    if (status !== undefined) {
+      const normalizedStatus = normalizeCardStatus(status);
+      if (!normalizedStatus) {
+        return NextResponse.json(
+          { error: `Invalid status. Must be one of: ${VALID_CARD_STATUSES.join(", ")}` },
+          { status: 400 }
+        );
+      }
+      updateData.status = normalizedStatus;
+    }
+
+    if (expiresAt !== undefined) {
+      const parsedExpiresAt = parseOptionalDate(expiresAt);
+      if (parsedExpiresAt === undefined) {
+        return NextResponse.json(
+          { error: "expiresAt must be a valid date when provided" },
+          { status: 400 }
+        );
+      }
+      updateData.expiresAt = parsedExpiresAt;
+    }
+
+    if (cardData !== undefined) {
+      const parsedCardData = parseCardData(cardData);
+      if (!parsedCardData) {
+        return NextResponse.json(
+          { error: "cardData must be a valid JSON object when provided" },
+          { status: 400 }
+        );
+      }
+      updateData.encryptedData = encryptJSON(parsedCardData);
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { error: "No fields to update" },
+        { status: 400 }
       );
     }
 
     const updated = await prisma.healthCard.update({
-      where: { id: cardId },
+      where: { id: normalizedCardId },
       data: updateData,
     });
 
@@ -208,7 +339,7 @@ export async function PATCH(request: Request) {
         actor: user.address,
         action: "HEALTH_CARD_UPDATED",
         meta: JSON.stringify({
-          cardId,
+          cardId: normalizedCardId,
           changes: Object.keys(updateData),
         }),
       },
