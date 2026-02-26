@@ -153,6 +153,29 @@ Feature-dependent variables (set only if feature is enabled):
 - Likely cause: docs/workflow file moved, renamed, or referenced path not updated.
 - Fix: update docs links and required references, then run `npm run check:docs-sync` locally.
 
+### `Label Audit / Verify governance labels exist` fails
+
+- Symptom: workflow summary lists missing governance labels.
+- Likely cause: labels were deleted/renamed in repository settings.
+- Fix: recreate missing labels, then rerun the workflow.
+
+Quick restore using GitHub CLI (`gh`) from repo root:
+
+```bash
+for label in security ci dependencies docs release needs-triage risk:low risk:medium risk:high; do
+	gh label create "$label" --repo advancia-devuser/advancia-healthcare1 --color BFD4F2 --description "Governance label" || true
+done
+```
+
+PowerShell equivalent:
+
+```powershell
+$labels = @('security','ci','dependencies','docs','release','needs-triage','risk:low','risk:medium','risk:high')
+foreach ($label in $labels) {
+	gh label create $label --repo advancia-devuser/advancia-healthcare1 --color BFD4F2 --description "Governance label" 2>$null
+}
+```
+
 ## 7) CI first-response playbook
 
 | Failing check | Likely owner | First local command |
