@@ -25,6 +25,7 @@ Triage SLA for `needs-triage`:
 
 ## Risk labels
 
+- `risk:low` — low-risk change; standard review path.
 - `risk:medium` — non-trivial behavior/config impact, requires focused review and validation.
 - `risk:high` — potentially user-impacting or security-sensitive change; requires explicit owner sign-off.
 

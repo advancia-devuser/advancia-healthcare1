@@ -1,0 +1,58 @@
+name: Triage Auto-Clear
+
+on:
+  issues:
+    types: [opened, edited, labeled, unlabeled, assigned, unassigned, reopened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  clear-needs-triage:
+    name: Auto-clear needs-triage when classified
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove needs-triage after assignment + classification
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = context.payload.issue;
+            if (!issue) {
+              core.info('No issue payload (workflow_dispatch). Skipping.');
+              return;
+            }
+
+            if (issue.pull_request) {
+              core.info('PR event detected in issues payload. Skipping.');
+              return;
+            }
+
+            const labels = (issue.labels || []).map((l) => (typeof l === 'string' ? l : l.name));
+            const hasNeedsTriage = labels.includes('needs-triage');
+            if (!hasNeedsTriage) {
+              core.info('Issue does not have needs-triage label. Nothing to do.');
+              return;
+            }
+
+            const hasAssignee = Array.isArray(issue.assignees) && issue.assignees.length > 0;
+            const riskLabels = new Set(['risk:low', 'risk:medium', 'risk:high']);
+            const domainLabels = new Set(['bug', 'enhancement', 'security', 'dependencies', 'ci', 'docs']);
+
+            const hasRisk = labels.some((name) => riskLabels.has(name));
+            const hasDomain = labels.some((name) => domainLabels.has(name));
+
+            if (!(hasAssignee && hasRisk && hasDomain)) {
+              core.info(`Not ready: assignee=${hasAssignee}, risk=${hasRisk}, domain=${hasDomain}`);
+              return;
+            }
+
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              name: 'needs-triage',
+            });
+
+            core.info(`Removed needs-triage from issue #${issue.number}`);
