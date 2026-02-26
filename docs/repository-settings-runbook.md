@@ -158,6 +158,7 @@ Feature-dependent variables (set only if feature is enabled):
 - Symptom: workflow summary lists missing governance labels.
 - Likely cause: labels were deleted/renamed in repository settings.
 - Fix: recreate missing labels, then rerun the workflow.
+- Optional strict metadata enforcement: set repository variable `LABEL_AUDIT_FAIL_ON_DRIFT=true` to fail when label color/description differs from canonical metadata.
 
 Quick restore using GitHub CLI (`gh`) from repo root:
 
@@ -226,6 +227,7 @@ When a PR is blocked by required checks, use this order:
 5. If optional `Label Audit` is required and failed:
 	- Run `.github/workflows/label-audit.yml` manually to review summary output.
 	- Create any missing governance labels listed in the failure summary.
+	- If enforcing metadata, align mismatched label color/description (or disable strict drift enforcement by unsetting `LABEL_AUDIT_FAIL_ON_DRIFT`).
 6. If `Post-Deploy Verify` failed:
 	- Confirm `STAGING_URL` exists in repo Actions variable/secret.
 	- Rerun workflow after updating missing values.

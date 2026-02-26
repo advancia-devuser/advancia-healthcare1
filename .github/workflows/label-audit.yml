@@ -19,6 +19,8 @@ jobs:
     steps:
       - name: Check required labels
         uses: actions/github-script@v7
+        env:
+          LABEL_AUDIT_FAIL_ON_DRIFT: ${{ vars.LABEL_AUDIT_FAIL_ON_DRIFT }}
         with:
           script: |
             const required = [
@@ -41,12 +43,30 @@ jobs:
 
             const existingByName = new Map(labels.map((label) => [label.name, label]));
             const missing = required.filter((label) => !existingByName.has(label.name));
+            const drift = required
+              .filter((expected) => existingByName.has(expected.name))
+              .map((expected) => {
+                const actual = existingByName.get(expected.name);
+                const colorMismatch = actual.color !== expected.color;
+                const descriptionMismatch = (actual.description || '') !== expected.description;
+                return {
+                  ...expected,
+                  actualColor: actual.color,
+                  actualDescription: actual.description || '',
+                  colorMismatch,
+                  descriptionMismatch,
+                };
+              })
+              .filter((item) => item.colorMismatch || item.descriptionMismatch);
+            const failOnDrift = String(process.env.LABEL_AUDIT_FAIL_ON_DRIFT || 'false').toLowerCase() === 'true';
 
             const lines = [];
             lines.push('## Label audit summary');
             lines.push('');
             lines.push(`Required labels: ${required.length}`);
             lines.push(`Missing labels: ${missing.length}`);
+            lines.push(`Metadata drift: ${drift.length}`);
+            lines.push(`Fail on drift: ${failOnDrift ? 'enabled' : 'disabled'}`);
             lines.push('');
             lines.push('| Label | Status | Expected color | Actual color | Expected description | Actual description |');
             lines.push('|---|---|---|---|---|---|');
@@ -69,8 +89,29 @@ jobs:
               }
             }
 
+            if (drift.length > 0) {
+              lines.push('');
+              lines.push('### Metadata drift details');
+              lines.push('');
+              lines.push('| Label | Expected color | Actual color | Expected description | Actual description |');
+              lines.push('|---|---|---|---|---|');
+              for (const item of drift) {
+                lines.push(`| ${item.name} | ${item.color} | ${item.actualColor} | ${item.description} | ${item.actualDescription || '—'} |`);
+              }
+            }
+
             require('node:fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
 
             if (missing.length > 0) {
               core.setFailed(`Missing required labels: ${missing.map((label) => label.name).join(', ')}`);
+              return;
+            }
+
+            if (drift.length > 0 && failOnDrift) {
+              core.setFailed(`Label metadata drift detected for: ${drift.map((item) => item.name).join(', ')}`);
+              return;
+            }
+
+            if (drift.length > 0) {
+              core.warning(`Label metadata drift detected for: ${drift.map((item) => item.name).join(', ')}. Set LABEL_AUDIT_FAIL_ON_DRIFT=true to enforce failure.`);
             }
