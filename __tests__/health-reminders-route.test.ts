@@ -69,6 +69,19 @@ describe("Health Reminders API", () => {
     expect(prisma.healthReminder.create).not.toHaveBeenCalled();
   });
 
+  test("POST returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/health/reminders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.healthReminder.create).not.toHaveBeenCalled();
+  });
+
   test("POST creates reminder and notification", async () => {
     const future = new Date(Date.now() + 3_600_000).toISOString();
     (prisma.healthReminder.create as unknown as jest.Mock).mockResolvedValue({ id: "r1" });
@@ -102,6 +115,19 @@ describe("Health Reminders API", () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reminderId: "r1" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.healthReminder.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/health/reminders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
     });
 
     const res = await PATCH(req);
