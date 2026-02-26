@@ -68,6 +68,18 @@ describe("Admin Cards API", () => {
     expect(prisma.cardRequest.update).not.toHaveBeenCalled();
   });
 
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/admin/cards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await PATCH(req);
+    expect(res.status).toBe(400);
+    expect(prisma.cardRequest.update).not.toHaveBeenCalled();
+  });
+
   test("PATCH rejects invalid last4", async () => {
     const req = new Request("http://localhost:3000/api/admin/cards", {
       method: "PATCH",
