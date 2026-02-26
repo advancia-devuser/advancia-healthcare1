@@ -28,5 +28,6 @@ Harden auth persistence and admin security; add CI/governance automation
 
 - [ ] Set/rotate production secrets
 - [ ] Confirm branch protection requires CI checks + code owner review
+- [ ] If governance-strict is enabled, confirm `Label Audit / Verify governance labels exist` is required and green
 - [ ] Run post-deploy verify script on staging/prod
 - [ ] Monitor auth/login lockout metrics after release
