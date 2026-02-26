@@ -19,6 +19,10 @@ Optional by environment/release flow:
 
 - `Post-Deploy Verify / Verify staging deployment`
 
+Optional for governance-strict repos:
+
+- `Label Audit / Verify governance labels exist`
+
 ### Apply branch protection in ~60 seconds (UI)
 
 1. Open GitHub repo → `Settings` → `Branches`.

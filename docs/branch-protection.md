@@ -58,6 +58,7 @@ If you use staged deployment validation, also require this check for release bra
 - Require signed commits
 - Restrict who can push to matching branches
 - Restrict who can dismiss pull request reviews
+- Add `Label Audit / Verify governance labels exist` as a required check for governance-strict repos
 
 ## Notes
 
@@ -65,4 +66,5 @@ If you use staged deployment validation, also require this check for release bra
 - `Verify staging deployment` is from `.github/workflows/post-deploy-verify.yml` and depends on `STAGING_URL` being configured.
 - `npm audit (high/critical gate)` is from `.github/workflows/dependency-audit.yml`.
 - `Validate docs/workflow sync` is from `.github/workflows/docs-consistency.yml`.
+- `Verify governance labels exist` is from `.github/workflows/label-audit.yml`.
 - If you make it required but `STAGING_URL` is missing, merges will block.
