@@ -3,6 +3,22 @@ import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { createWallet } from "@/lib/ledger";
 
+function normalizeNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized ? normalized : null;
+}
+
+function parsePositiveChainId(value: unknown): number | null {
+  const parsed = typeof value === "number" ? Math.trunc(value) : Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+}
+
 /**
  * GET /api/wallets — get the current user's wallet
  */
@@ -32,9 +48,20 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const { smartAccountAddress, chainId } = await request.json();
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    if (!smartAccountAddress || !chainId) {
+    const { smartAccountAddress, chainId } = body as {
+      smartAccountAddress?: unknown;
+      chainId?: unknown;
+    };
+
+    const normalizedSmartAccountAddress = normalizeNonEmptyString(smartAccountAddress);
+    const normalizedChainId = parsePositiveChainId(chainId);
+
+    if (!normalizedSmartAccountAddress || !normalizedChainId) {
       return NextResponse.json(
         { error: "smartAccountAddress and chainId are required" },
         { status: 400 }
@@ -49,7 +76,7 @@ export async function POST(request: Request) {
       // Update if chain changed
       const wallet = await prisma.wallet.update({
         where: { id: existing.id },
-        data: { smartAccountAddress, chainId },
+        data: { smartAccountAddress: normalizedSmartAccountAddress, chainId: normalizedChainId },
       });
 
       // Ensure default ledger row exists
@@ -61,8 +88,8 @@ export async function POST(request: Request) {
     const wallet = await prisma.wallet.create({
       data: {
         userId: user.id,
-        smartAccountAddress,
-        chainId,
+        smartAccountAddress: normalizedSmartAccountAddress,
+        chainId: normalizedChainId,
       },
     });
 
@@ -75,7 +102,7 @@ export async function POST(request: Request) {
         userId: user.id,
         actor: user.address,
         action: "WALLET_CREATED",
-        meta: JSON.stringify({ smartAccountAddress, chainId }),
+        meta: JSON.stringify({ smartAccountAddress: normalizedSmartAccountAddress, chainId: normalizedChainId }),
       },
     });
 
