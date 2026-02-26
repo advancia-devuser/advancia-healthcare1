@@ -14,6 +14,23 @@ import { requireApprovedUser, checkRateLimitPersistent, getClientIP } from "@/li
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
 
 const SALT_LENGTH = 16;
+const PIN_REGEX = /^\d{6}$/;
+
+function normalizeNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized ? normalized : null;
+}
+
+function normalizePin(value: unknown): string | null {
+  const normalized = normalizeNonEmptyString(value);
+  if (!normalized || !PIN_REGEX.test(normalized)) {
+    return null;
+  }
+  return normalized;
+}
 
 function hashPin(pin: string): string {
   const salt = randomBytes(SALT_LENGTH).toString("hex");
@@ -31,8 +48,19 @@ function verifyPin(pin: string, stored: string): boolean {
 export async function POST(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const body = await request.json();
-    const { action, pin, currentPin, newPin } = body;
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const { action, pin, currentPin, newPin } = body as {
+      action?: unknown;
+      pin?: unknown;
+      currentPin?: unknown;
+      newPin?: unknown;
+    };
+
+    const normalizedAction = normalizeNonEmptyString(action);
 
     // Rate limit PIN attempts (5 per minute)
     const ip = getClientIP(request);
@@ -43,7 +71,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!action) {
+    if (!normalizedAction) {
       return NextResponse.json(
         { error: "action is required (setup | verify | change)" },
         { status: 400 }
@@ -51,7 +79,7 @@ export async function POST(request: Request) {
     }
 
     /* ─── SETUP: Set initial PIN ─── */
-    if (action === "setup") {
+    if (normalizedAction === "setup") {
       if (user.pin) {
         return NextResponse.json(
           { error: "PIN is already set. Use 'change' to update it." },
@@ -59,14 +87,15 @@ export async function POST(request: Request) {
         );
       }
 
-      if (!pin || typeof pin !== "string" || !/^\d{6}$/.test(pin)) {
+      const normalizedPin = normalizePin(pin);
+      if (!normalizedPin) {
         return NextResponse.json(
           { error: "PIN must be exactly 6 digits" },
           { status: 400 }
         );
       }
 
-      const hashed = hashPin(pin);
+      const hashed = hashPin(normalizedPin);
       await prisma.user.update({
         where: { id: user.id },
         data: { pin: hashed },
@@ -93,7 +122,7 @@ export async function POST(request: Request) {
     }
 
     /* ─── VERIFY: Check a PIN ─── */
-    if (action === "verify") {
+    if (normalizedAction === "verify") {
       if (!user.pin) {
         return NextResponse.json(
           { error: "No PIN set. Call setup first." },
@@ -101,14 +130,15 @@ export async function POST(request: Request) {
         );
       }
 
-      if (!pin || typeof pin !== "string") {
+      const pinInput = normalizeNonEmptyString(pin);
+      if (!pinInput) {
         return NextResponse.json(
           { error: "pin is required" },
           { status: 400 }
         );
       }
 
-      const valid = verifyPin(pin, user.pin);
+      const valid = verifyPin(pinInput, user.pin);
 
       if (!valid) {
         await prisma.auditLog.create({
@@ -129,7 +159,7 @@ export async function POST(request: Request) {
     }
 
     /* ─── CHANGE: Update PIN ─── */
-    if (action === "change") {
+    if (normalizedAction === "change") {
       if (!user.pin) {
         return NextResponse.json(
           { error: "No PIN set. Use setup first." },
@@ -137,21 +167,17 @@ export async function POST(request: Request) {
         );
       }
 
-      if (!currentPin || !newPin) {
+      const currentPinInput = normalizeNonEmptyString(currentPin);
+      const newPinInput = normalizePin(newPin);
+
+      if (!currentPinInput || !newPinInput) {
         return NextResponse.json(
-          { error: "currentPin and newPin are required" },
+          { error: "currentPin and newPin are required and newPin must be exactly 6 digits" },
           { status: 400 }
         );
       }
 
-      if (typeof newPin !== "string" || !/^\d{6}$/.test(newPin)) {
-        return NextResponse.json(
-          { error: "New PIN must be exactly 6 digits" },
-          { status: 400 }
-        );
-      }
-
-      const valid = verifyPin(currentPin, user.pin);
+      const valid = verifyPin(currentPinInput, user.pin);
       if (!valid) {
         return NextResponse.json(
           { error: "Current PIN is incorrect" },
@@ -159,7 +185,7 @@ export async function POST(request: Request) {
         );
       }
 
-      const hashed = hashPin(newPin);
+      const hashed = hashPin(newPinInput);
       await prisma.user.update({
         where: { id: user.id },
         data: { pin: hashed },
