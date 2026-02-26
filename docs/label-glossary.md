@@ -41,7 +41,7 @@ Triage SLA for `needs-triage`:
 Use this mapping when recreating labels after accidental deletion/rename.
 
 | Label | Color | Description |
-|---|---|---|
+| --- | --- | --- |
 | `security` | `d73a4a` | Security hardening and vulnerability remediation |
 | `ci` | `1d76db` | CI/CD workflow and automation changes |
 | `dependencies` | `0366d6` | Dependency/version and lockfile updates |

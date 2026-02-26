@@ -26,39 +26,23 @@ Optional for governance-strict repos:
 ### Apply branch protection in ~60 seconds (UI)
 
 1. Open GitHub repo → `Settings` → `Branches`.
-2. Edit existing rule for `main` (or click `Add rule` with branch pattern `main`).
-3. Enable:
-	- `Require a pull request before merging`
-	- `Require approvals` (minimum `1`)
-	- `Require review from Code Owners`
-	- `Require status checks to pass before merging`
-	- `Require branches to be up to date before merging`
-	- `Require conversation resolution before merging`
-	- `Include administrators`
-4. Add required checks:
-	- `CI Tests / Env validation tests`
-	- `CI Tests / Unit/API tests (excluding env group)`
-	- `Dependency Audit / npm audit (high/critical gate)`
-	- `Docs Consistency / Validate docs/workflow sync`
-5. Optional for governance-strict repos: also add
-	- `Label Audit / Verify governance labels exist`
-6. Save changes.
+1. Edit existing rule for `main` (or click `Add rule` with branch pattern `main`).
+1. Enable branch protection options: `Require a pull request before merging`, `Require approvals` (minimum `1`), `Require review from Code Owners`, `Require status checks to pass before merging`, `Require branches to be up to date before merging`, `Require conversation resolution before merging`, and `Include administrators`.
+1. Add required checks: `CI Tests / Env validation tests`, `CI Tests / Unit/API tests (excluding env group)`, `Dependency Audit / npm audit (high/critical gate)`, and `Docs Consistency / Validate docs/workflow sync`.
+1. Optional for governance-strict repos: add `Label Audit / Verify governance labels exist`.
+1. Save changes.
 
 ## 2) Required repository variables and secrets
 
 ### Verify variables/secrets in ~60 seconds (UI)
 
 1. Open GitHub repo → `Settings`.
-2. Open `Secrets and variables` → `Actions`.
-3. In **Variables**, verify at least one staging target is present:
-	- `STAGING_URL`
-4. In **Variables**, optionally set strict label metadata enforcement:
-	- `LABEL_AUDIT_FAIL_ON_DRIFT` = `true` (or leave unset/`false` for warning-only drift reporting)
-5. In **Secrets**, verify either `STAGING_URL` exists or the variable above is set.
-6. In **Secrets**, verify optional admin checks if used:
-	- `STAGING_ADMIN_PASSWORD`
-	- `STAGING_ADMIN_TOTP`
-7. Save any missing values, then run `Post-Deploy Verify` via `workflow_dispatch`.
+1. Open `Secrets and variables` → `Actions`.
+1. In **Variables**, verify `STAGING_URL` exists.
+1. In **Variables**, optionally set strict metadata enforcement: `LABEL_AUDIT_FAIL_ON_DRIFT=true` (or leave unset/`false` for warning-only drift reporting).
+1. In **Secrets**, verify either `STAGING_URL` exists or the variable above is set.
+1. In **Secrets**, verify optional admin checks if used: `STAGING_ADMIN_PASSWORD` and `STAGING_ADMIN_TOTP`.
+1. Save any missing values, then run `Post-Deploy Verify` via `workflow_dispatch`.
 
 ### Required for post-deploy verification workflow
 
@@ -203,20 +187,20 @@ Quick restore using GitHub CLI (`gh`) from repo root:
 
 ```bash
 labels=(
-	"security|d73a4a|Security hardening and vulnerability remediation"
-	"ci|1d76db|CI/CD workflow and automation changes"
-	"dependencies|0366d6|Dependency/version and lockfile updates"
-	"docs|0e8a16|Documentation and runbook updates"
-	"release|5319e7|Release planning, sign-off, and readiness"
-	"needs-triage|fbca04|Requires owner assignment and initial classification"
-	"risk:low|0e8a16|Low-risk change"
-	"risk:medium|fbca04|Medium-risk change"
-	"risk:high|d73a4a|High-risk or security-sensitive change"
+  "security|d73a4a|Security hardening and vulnerability remediation"
+  "ci|1d76db|CI/CD workflow and automation changes"
+  "dependencies|0366d6|Dependency/version and lockfile updates"
+  "docs|0e8a16|Documentation and runbook updates"
+  "release|5319e7|Release planning, sign-off, and readiness"
+  "needs-triage|fbca04|Requires owner assignment and initial classification"
+  "risk:low|0e8a16|Low-risk change"
+  "risk:medium|fbca04|Medium-risk change"
+  "risk:high|d73a4a|High-risk or security-sensitive change"
 )
 
 for entry in "${labels[@]}"; do
-	IFS='|' read -r label color description <<< "$entry"
-	gh label create "$label" --repo advancia-devuser/advancia-healthcare1 --color "$color" --description "$description" || true
+  IFS='|' read -r label color description <<< "$entry"
+  gh label create "$label" --repo advancia-devuser/advancia-healthcare1 --color "$color" --description "$description" || true
 done
 ```
 
@@ -224,26 +208,26 @@ PowerShell equivalent:
 
 ```powershell
 $labels = @(
-	@{ Name = 'security'; Color = 'd73a4a'; Description = 'Security hardening and vulnerability remediation' },
-	@{ Name = 'ci'; Color = '1d76db'; Description = 'CI/CD workflow and automation changes' },
-	@{ Name = 'dependencies'; Color = '0366d6'; Description = 'Dependency/version and lockfile updates' },
-	@{ Name = 'docs'; Color = '0e8a16'; Description = 'Documentation and runbook updates' },
-	@{ Name = 'release'; Color = '5319e7'; Description = 'Release planning, sign-off, and readiness' },
-	@{ Name = 'needs-triage'; Color = 'fbca04'; Description = 'Requires owner assignment and initial classification' },
-	@{ Name = 'risk:low'; Color = '0e8a16'; Description = 'Low-risk change' },
-	@{ Name = 'risk:medium'; Color = 'fbca04'; Description = 'Medium-risk change' },
-	@{ Name = 'risk:high'; Color = 'd73a4a'; Description = 'High-risk or security-sensitive change' }
+  @{ Name = 'security'; Color = 'd73a4a'; Description = 'Security hardening and vulnerability remediation' },
+  @{ Name = 'ci'; Color = '1d76db'; Description = 'CI/CD workflow and automation changes' },
+  @{ Name = 'dependencies'; Color = '0366d6'; Description = 'Dependency/version and lockfile updates' },
+  @{ Name = 'docs'; Color = '0e8a16'; Description = 'Documentation and runbook updates' },
+  @{ Name = 'release'; Color = '5319e7'; Description = 'Release planning, sign-off, and readiness' },
+  @{ Name = 'needs-triage'; Color = 'fbca04'; Description = 'Requires owner assignment and initial classification' },
+  @{ Name = 'risk:low'; Color = '0e8a16'; Description = 'Low-risk change' },
+  @{ Name = 'risk:medium'; Color = 'fbca04'; Description = 'Medium-risk change' },
+  @{ Name = 'risk:high'; Color = 'd73a4a'; Description = 'High-risk or security-sensitive change' }
 )
 
 foreach ($label in $labels) {
-	gh label create $label.Name --repo advancia-devuser/advancia-healthcare1 --color $label.Color --description $label.Description 2>$null
+  gh label create $label.Name --repo advancia-devuser/advancia-healthcare1 --color $label.Color --description $label.Description 2>$null
 }
 ```
 
 ## 7) CI first-response playbook
 
 | Failing check | Likely owner | First local command |
-|---|---|---|
+| --- | --- | --- |
 | `CI Tests / Env validation tests` | Backend/platform engineer | `npx jest --config jest.config.cjs --runInBand __tests__/env.test.ts` |
 | `CI Tests / Unit/API tests (excluding env group)` | Feature owner of changed code | `npm test` |
 | `Dependency Audit / npm audit (high/critical gate)` | Dependency/security owner | `npm audit --json` |
@@ -254,23 +238,12 @@ foreach ($label in $labels) {
 When a PR is blocked by required checks, use this order:
 
 1. Open failing check summary and copy first actionable error line.
-2. If `CI Tests` failed:
-	- Reproduce locally with `npm test`.
-	- Fix test or update test fixture; rerun until green.
-3. If `Dependency Audit` failed:
-	- Run `npm audit --json`.
-	- Address high/critical findings first, rerun tests.
-4. If `Docs Consistency` failed:
-	- Run `npm run check:docs-sync`.
-	- Add missing links/references reported by script.
-5. If optional `Label Audit` is required and failed:
-	- Run `.github/workflows/label-audit.yml` manually to review summary output.
-	- Create any missing governance labels listed in the failure summary.
-	- If enforcing metadata, align mismatched label color/description (or disable strict drift enforcement by unsetting `LABEL_AUDIT_FAIL_ON_DRIFT`).
-6. If `Post-Deploy Verify` failed:
-	- Confirm `STAGING_URL` exists in repo Actions variable/secret.
-	- Rerun workflow after updating missing values.
-7. Push fix branch and confirm all required checks are green before merge.
+1. If `CI Tests` failed, reproduce locally with `npm test`, then fix test or fixture regressions and rerun until green.
+1. If `Dependency Audit` failed, run `npm audit --json`, address high/critical findings first, then rerun tests.
+1. If `Docs Consistency` failed, run `npm run check:docs-sync` and add missing links/references reported by the script.
+1. If optional `Label Audit` is required and failed, run `.github/workflows/label-audit.yml` manually, restore missing labels, and if strict metadata is enabled align mismatched color/description (or unset `LABEL_AUDIT_FAIL_ON_DRIFT`).
+1. If `Post-Deploy Verify` failed, confirm `STAGING_URL` exists in repo Actions variable/secret and rerun the workflow.
+1. Push fix branch and confirm all required checks are green before merge.
 
 ## 8) Escalation triggers and handoff package
 
@@ -296,7 +269,7 @@ Include this handoff package in the escalation note:
 ## 9) Severity SLA targets
 
 | Severity | Initial acknowledgment | Containment/fix target | Owner |
-|---|---:|---:|---|
+| --- | ---: | ---: | --- |
 | Critical | 1 hour | Same business day | Security + Platform |
 | High | 4 hours | 1 business day | Security/Dependency owner |
 | Moderate | 1 business day | Planned in next dependency cycle | Dependency owner |

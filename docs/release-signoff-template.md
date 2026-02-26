@@ -4,10 +4,10 @@ Use this template in PR descriptions or release notes for final approval.
 
 ## Release
 
-- Target environment: 
-- Planned window (UTC): 
-- Release owner: 
-- Rollback owner: 
+- Target environment:
+- Planned window (UTC):
+- Release owner:
+- Rollback owner:
 
 ## Pre-release checks
 

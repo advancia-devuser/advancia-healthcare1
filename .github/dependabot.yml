@@ -6,7 +6,7 @@ updates:
       interval: weekly
       day: monday
       time: "08:00"
-      timezone: "UTC"
+      timezone: "Etc/UTC"
     open-pull-requests-limit: 5
     labels:
       - dependencies
@@ -32,7 +32,7 @@ updates:
       interval: weekly
       day: monday
       time: "08:30"
-      timezone: "UTC"
+      timezone: "Etc/UTC"
     open-pull-requests-limit: 3
     labels:
       - dependencies
