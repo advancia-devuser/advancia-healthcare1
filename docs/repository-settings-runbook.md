@@ -161,6 +161,7 @@ Feature-dependent variables (set only if feature is enabled):
 | `CI Tests / Unit/API tests (excluding env group)` | Feature owner of changed code | `npm test` |
 | `Dependency Audit / npm audit (high/critical gate)` | Dependency/security owner | `npm audit --json` |
 | `Docs Consistency / Validate docs/workflow sync` | Docs/DevEx owner | `npm run check:docs-sync` |
+| `Label Audit / Verify governance labels exist` (if required) | Repo admin / DevEx owner | Run `.github/workflows/label-audit.yml` via `workflow_dispatch` and restore missing labels |
 | `Post-Deploy Verify / Verify staging deployment` | Release/platform owner | `bash scripts/post-deploy-verify.sh <STAGING_URL>` |
 
 When a PR is blocked by required checks, use this order:
@@ -175,10 +176,13 @@ When a PR is blocked by required checks, use this order:
 4. If `Docs Consistency` failed:
 	- Run `npm run check:docs-sync`.
 	- Add missing links/references reported by script.
-5. If `Post-Deploy Verify` failed:
+5. If optional `Label Audit` is required and failed:
+	- Run `.github/workflows/label-audit.yml` manually to review summary output.
+	- Create any missing governance labels listed in the failure summary.
+6. If `Post-Deploy Verify` failed:
 	- Confirm `STAGING_URL` exists in repo Actions variable/secret.
 	- Rerun workflow after updating missing values.
-6. Push fix branch and confirm all required checks are green before merge.
+7. Push fix branch and confirm all required checks are green before merge.
 
 ## 8) Escalation triggers and handoff package
 
