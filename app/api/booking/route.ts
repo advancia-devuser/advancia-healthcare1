@@ -12,6 +12,58 @@ const CHAMBERS = [
 const VALID_TIME_SLOTS = ["09:00 AM", "11:00 AM", "02:00 PM", "04:00 PM"];
 const MAX_DURATION_HOURS = 4;
 
+type ChamberId = (typeof CHAMBERS)[number]["id"];
+
+function normalizeNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeBoolean(value: unknown, fallback: boolean): boolean {
+  if (value === undefined || value === null) {
+    return fallback;
+  }
+  return value === true;
+}
+
+function normalizeChamber(value: unknown): ChamberId | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  return CHAMBERS.some((c) => c.id === normalized) ? (normalized as ChamberId) : null;
+}
+
+function normalizeDate(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : null;
+}
+
+function normalizeTimeSlot(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  return VALID_TIME_SLOTS.includes(normalized) ? normalized : null;
+}
+
+function parseDurationHours(value: unknown, fallback: number): number | null {
+  if (value === undefined || value === null || value === "") {
+    return fallback;
+  }
+  const parsed = typeof value === "number" ? Math.floor(value) : Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed)) {
+    return null;
+  }
+  return Math.min(MAX_DURATION_HOURS, Math.max(1, parsed));
+}
+
 /**
  * GET /api/booking — list current user's bookings + chamber catalogue
  */
@@ -44,12 +96,27 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const body = await request.json().catch(() => ({}));
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    const { chamber, date, timeSlot, duration = 1, payWithWallet = false } = body;
+    const { chamber, date, timeSlot, duration, payWithWallet } = body as {
+      chamber?: unknown;
+      date?: unknown;
+      timeSlot?: unknown;
+      duration?: unknown;
+      payWithWallet?: unknown;
+    };
+
+    const normalizedChamber = normalizeChamber(chamber);
+    const normalizedDate = normalizeDate(date);
+    const normalizedTimeSlot = normalizeTimeSlot(timeSlot);
+    const durationHours = parseDurationHours(duration, 1);
+    const shouldPayWithWallet = normalizeBoolean(payWithWallet, false);
 
     // Validate chamber
-    const chamberInfo = CHAMBERS.find((c) => c.id === chamber);
+    const chamberInfo = CHAMBERS.find((c) => c.id === normalizedChamber);
     if (!chamberInfo) {
       return NextResponse.json(
         { error: "Invalid chamber. Choose: alpha, beta, or omega" },
@@ -58,11 +125,11 @@ export async function POST(request: Request) {
     }
 
     // Validate date
-    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    if (!normalizedDate) {
       return NextResponse.json({ error: "Date is required in YYYY-MM-DD format" }, { status: 400 });
     }
 
-    const bookingDate = new Date(date + "T00:00:00Z");
+    const bookingDate = new Date(normalizedDate + "T00:00:00Z");
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     if (bookingDate < today) {
@@ -70,7 +137,7 @@ export async function POST(request: Request) {
     }
 
     // Validate time slot
-    if (!VALID_TIME_SLOTS.includes(timeSlot)) {
+    if (!normalizedTimeSlot) {
       return NextResponse.json(
         { error: `Invalid time slot. Choose: ${VALID_TIME_SLOTS.join(", ")}` },
         { status: 400 }
@@ -78,8 +145,7 @@ export async function POST(request: Request) {
     }
 
     // Validate duration (user passes hours, store as minutes)
-    const durationHours = Math.min(MAX_DURATION_HOURS, Math.max(1, Math.floor(Number(duration))));
-    if (isNaN(durationHours)) {
+    if (!durationHours) {
       return NextResponse.json({ error: "Duration must be a number of hours (1-4)" }, { status: 400 });
     }
     const durationMinutes = durationHours * 60;
@@ -91,15 +157,15 @@ export async function POST(request: Request) {
     // Check availability (unique constraint: chamber + date + timeSlot)
     const existing = await prisma.booking.findFirst({
       where: {
-        chamber,
-        date,
-        timeSlot,
+        chamber: chamberInfo.id,
+        date: normalizedDate,
+        timeSlot: normalizedTimeSlot,
         status: { notIn: ["CANCELLED"] },
       },
     });
     if (existing) {
       return NextResponse.json(
-        { error: `${chamberInfo.name} is already booked at ${timeSlot} on ${date}` },
+        { error: `${chamberInfo.name} is already booked at ${normalizedTimeSlot} on ${normalizedDate}` },
         { status: 409 }
       );
     }
@@ -109,7 +175,7 @@ export async function POST(request: Request) {
     let paidWithAsset: string | undefined;
     let paidAmount: string | undefined;
 
-    if (payWithWallet) {
+    if (shouldPayWithWallet) {
       // Import ledger helpers dynamically to keep this module small
       const { debitWallet } = await import("@/lib/ledger");
       const weiAmount = BigInt(Math.round(priceUsd * 1e18)).toString();
@@ -121,7 +187,7 @@ export async function POST(request: Request) {
           amount: weiAmount,
           chainId: 1,
           type: "SEND",
-          meta: { purpose: "booking", chamber, date, timeSlot },
+          meta: { purpose: "booking", chamber: chamberInfo.id, date: normalizedDate, timeSlot: normalizedTimeSlot },
         });
         txHash = result.transactionId;
         paidWithAsset = "ETH";
@@ -137,13 +203,13 @@ export async function POST(request: Request) {
     const booking = await prisma.booking.create({
       data: {
         userId: user.id,
-        chamber,
+        chamber: chamberInfo.id,
         chamberName: chamberInfo.name,
-        date,
-        timeSlot,
+        date: normalizedDate,
+        timeSlot: normalizedTimeSlot,
         duration: durationMinutes,
         priceUsd: priceUsdStr,
-        status: payWithWallet ? "CONFIRMED" : "PENDING",
+        status: shouldPayWithWallet ? "CONFIRMED" : "PENDING",
         paidWithAsset: paidWithAsset || null,
         paidAmount: paidAmount || null,
         txHash: txHash || null,
@@ -156,7 +222,7 @@ export async function POST(request: Request) {
         userId: user.id,
         actor: user.address,
         action: "BOOKING_CREATED",
-        meta: JSON.stringify({ chamber, date, timeSlot, priceUsd, durationHours }),
+        meta: JSON.stringify({ chamber: chamberInfo.id, date: normalizedDate, timeSlot: normalizedTimeSlot, priceUsd, durationHours }),
       },
     });
 
@@ -165,7 +231,7 @@ export async function POST(request: Request) {
       data: {
         userId: user.id,
         title: "Booking Confirmed",
-        body: `${chamberInfo.name} booked for ${date} at ${timeSlot} (${durationHours}hr) — $${priceUsd}`,
+        body: `${chamberInfo.name} booked for ${normalizedDate} at ${normalizedTimeSlot} (${durationHours}hr) — $${priceUsd}`,
       },
     });
 
@@ -183,14 +249,20 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const { bookingId } = await request.json();
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    if (!bookingId) {
+    const { bookingId } = body as { bookingId?: unknown };
+    const normalizedBookingId = normalizeNonEmptyString(bookingId);
+
+    if (!normalizedBookingId) {
       return NextResponse.json({ error: "bookingId required" }, { status: 400 });
     }
 
     const booking = await prisma.booking.findFirst({
-      where: { id: bookingId, userId: user.id },
+      where: { id: normalizedBookingId, userId: user.id },
     });
 
     if (!booking) {
@@ -213,7 +285,7 @@ export async function PATCH(request: Request) {
     }
 
     const updated = await prisma.booking.update({
-      where: { id: bookingId },
+      where: { id: normalizedBookingId },
       data: { status: "CANCELLED" },
     });
 
@@ -226,7 +298,7 @@ export async function PATCH(request: Request) {
         amount: booking.paidAmount,
         chainId: 1,
         type: "RECEIVE",
-        meta: { purpose: "booking_refund", bookingId },
+        meta: { purpose: "booking_refund", bookingId: normalizedBookingId },
       });
     }
 
@@ -235,7 +307,7 @@ export async function PATCH(request: Request) {
         userId: user.id,
         actor: user.address,
         action: "BOOKING_CANCELLED",
-        meta: JSON.stringify({ bookingId }),
+        meta: JSON.stringify({ bookingId: normalizedBookingId }),
       },
     });
 
