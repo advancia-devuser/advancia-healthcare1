@@ -2,6 +2,8 @@
 
 Use this as the minimum policy for `main` in GitHub repository settings.
 
+For full repository setup (variables/secrets + workflow readiness), see `docs/repository-settings-runbook.md`.
+
 ## Recommended protection rules
 
 - Require a pull request before merging
