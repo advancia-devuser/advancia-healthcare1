@@ -42,11 +42,18 @@ Test evidence (paste relevant output):
 ## Post-deploy verification
 
 - [ ] Ran `bash scripts/post-deploy-verify.sh https://<target-domain>`
-- [ ] Required checks green in CI (`Env validation tests`, `Unit/API tests (excluding env group)`)
-- [ ] If enabled, staging verification check green (`Verify staging deployment`)
+- [ ] Required checks green in CI (`CI Tests / Env validation tests`, `CI Tests / Unit/API tests (excluding env group)`, `Dependency Audit / npm audit (high/critical gate)`, `Docs Consistency / Validate docs/workflow sync`)
+- [ ] If enabled, staging verification check green (`Post-Deploy Verify / Verify staging deployment`)
+
+## Release sign-off (release PRs)
+
+- [ ] Completed `docs/release-signoff-template.md` and attached to this PR (or linked equivalent release notes)
 
 ## References
 
 - Branch protection policy: `docs/branch-protection.md`
+- Repository settings runbook: `docs/repository-settings-runbook.md`
+- Release readiness checklist: `docs/release-readiness-checklist.md`
+- Release sign-off template: `docs/release-signoff-template.md`
 - CI workflow: `.github/workflows/ci-tests.yml`
 - Post-deploy workflow: `.github/workflows/post-deploy-verify.yml`
