@@ -17,6 +17,10 @@ If governance-strict branch protection is enabled:
 
 - `Label Audit / Verify governance labels exist`
 
+If strict metadata enforcement is enabled:
+
+- `LABEL_AUDIT_FAIL_ON_DRIFT=true` is configured and Label Audit has no drift failures
+
 ## 2) Security and dependency posture
 
 - `npm audit` has `0` high and `0` critical findings.
