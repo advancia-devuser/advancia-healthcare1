@@ -64,6 +64,19 @@ describe("Devices API", () => {
     expect(prisma.device.upsert).not.toHaveBeenCalled();
   });
 
+  test("POST returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/devices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.device.upsert).not.toHaveBeenCalled();
+  });
+
   test("POST upserts device with normalized values", async () => {
     (prisma.device.upsert as unknown as jest.Mock).mockResolvedValue({ id: "d1" });
 
@@ -108,6 +121,19 @@ describe("Devices API", () => {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.device.updateMany).not.toHaveBeenCalled();
+  });
+
+  test("DELETE returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/devices", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
     });
 
     const res = await DELETE(req);
