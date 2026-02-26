@@ -40,7 +40,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const status: RequestStatus | undefined = candidateStatus;
+    const status: RequestStatus | undefined =
+      candidateStatus && isRequestStatus(candidateStatus) ? candidateStatus : undefined;
 
     const where: { status?: RequestStatus } = {};
     if (status) where.status = status;
