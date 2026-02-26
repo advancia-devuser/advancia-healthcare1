@@ -9,6 +9,57 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireApprovedUser } from "@/lib/auth";
 import { debitWallet } from "@/lib/ledger";
+import { HealthTransactionStatus } from "@prisma/client";
+
+const HEALTH_TRANSACTION_STATUSES = new Set<HealthTransactionStatus>([
+  HealthTransactionStatus.PENDING,
+  HealthTransactionStatus.COMPLETED,
+  HealthTransactionStatus.FAILED,
+]);
+
+function normalizeNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function parsePositiveInteger(value: string | null, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function normalizeHealthTxStatus(value: string | null): HealthTransactionStatus | null {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim().toUpperCase();
+  return HEALTH_TRANSACTION_STATUSES.has(normalized as HealthTransactionStatus)
+    ? (normalized as HealthTransactionStatus)
+    : null;
+}
+
+function normalizeBigIntAmount(value: unknown): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  const raw = typeof value === "string" ? value.trim() : String(value);
+  if (!/^\d+$/.test(raw)) {
+    return null;
+  }
+  if (BigInt(raw) <= BigInt(0)) {
+    return null;
+  }
+  return raw;
+}
 
 /* ─── GET — Health transaction history ─── */
 export async function GET(request: Request) {
@@ -16,13 +67,18 @@ export async function GET(request: Request) {
     const user = await requireApprovedUser(request);
 
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status"); // PENDING, COMPLETED, FAILED
-    const healthCardId = searchParams.get("healthCardId");
-    const page = parseInt(searchParams.get("page") ?? "1");
-    const limit = parseInt(searchParams.get("limit") ?? "20");
+    const rawStatus = searchParams.get("status"); // PENDING, COMPLETED, FAILED
+    const status = normalizeHealthTxStatus(rawStatus);
+    const healthCardId = normalizeNonEmptyString(searchParams.get("healthCardId"));
+    const page = parsePositiveInteger(searchParams.get("page"), 1);
+    const limit = Math.min(100, parsePositiveInteger(searchParams.get("limit"), 20));
     const skip = (page - 1) * limit;
 
-    const where: Record<string, unknown> = { userId: user.id };
+    if (rawStatus && !status) {
+      return NextResponse.json({ error: "status must be PENDING, COMPLETED, or FAILED" }, { status: 400 });
+    }
+
+    const where: { userId: string; status?: HealthTransactionStatus; healthCardId?: string } = { userId: user.id };
     if (status) where.status = status;
     if (healthCardId) where.healthCardId = healthCardId;
 
@@ -65,36 +121,34 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const body = await request.json();
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    const { healthCardId, amount, description, currency } = body;
+    const { healthCardId, amount, description, currency } = body as {
+      healthCardId?: unknown;
+      amount?: unknown;
+      description?: unknown;
+      currency?: unknown;
+    };
 
-    if (!amount || !description) {
+    const normalizedHealthCardId = normalizeNonEmptyString(healthCardId);
+    const normalizedAmount = normalizeBigIntAmount(amount);
+    const normalizedDescription = normalizeNonEmptyString(description);
+    const normalizedCurrency = normalizeNonEmptyString(currency) || "USD";
+
+    if (!normalizedAmount || !normalizedDescription) {
       return NextResponse.json(
         { error: "amount and description are required" },
         { status: 400 }
       );
     }
 
-    // Validate amount
-    try {
-      if (BigInt(amount) <= BigInt(0)) {
-        return NextResponse.json(
-          { error: "Amount must be positive" },
-          { status: 400 }
-        );
-      }
-    } catch {
-      return NextResponse.json(
-        { error: "Invalid amount format" },
-        { status: 400 }
-      );
-    }
-
     // Verify health card if provided
-    if (healthCardId) {
+    if (normalizedHealthCardId) {
       const card = await prisma.healthCard.findFirst({
-        where: { id: healthCardId, userId: user.id, status: "ACTIVE" },
+        where: { id: normalizedHealthCardId, userId: user.id, status: "ACTIVE" },
       });
       if (!card) {
         return NextResponse.json(
@@ -122,12 +176,12 @@ export async function POST(request: Request) {
     const healthTx = await prisma.healthTransaction.create({
       data: {
         userId: user.id,
-        healthCardId: healthCardId ?? null,
-        amount,
+        healthCardId: normalizedHealthCardId ?? null,
+        amount: normalizedAmount,
         asset: "ETH",
-        currency: currency ?? "USD",
+        currency: normalizedCurrency,
         status: "PENDING",
-        description,
+        description: normalizedDescription,
         reference,
       },
     });
@@ -137,14 +191,14 @@ export async function POST(request: Request) {
       await debitWallet({
         userId: user.id,
         asset: "ETH",
-        amount,
+        amount: normalizedAmount,
         chainId: wallet.chainId,
         type: "SEND",
         txHash: `health-payment-${healthTx.id}`,
         from: wallet.smartAccountAddress,
         meta: {
           healthTransactionId: healthTx.id,
-          description,
+          description: normalizedDescription,
           reference,
         },
       });
@@ -160,7 +214,7 @@ export async function POST(request: Request) {
         data: {
           userId: user.id,
           title: "Health Payment Completed",
-          body: `Payment of ${amount} wei for "${description}" processed successfully.`,
+          body: `Payment of ${normalizedAmount} wei for "${normalizedDescription}" processed successfully.`,
           channel: "IN_APP",
           meta: JSON.stringify({ healthTransactionId: healthTx.id, reference }),
         },
@@ -174,8 +228,8 @@ export async function POST(request: Request) {
           action: "HEALTH_PAYMENT_COMPLETED",
           meta: JSON.stringify({
             healthTransactionId: healthTx.id,
-            amount,
-            description,
+            amount: normalizedAmount,
+            description: normalizedDescription,
             reference,
           }),
         },
