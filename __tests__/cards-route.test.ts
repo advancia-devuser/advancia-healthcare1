@@ -153,6 +153,19 @@ describe("Cards API", () => {
     expect(prisma.cardRequest.findFirst).not.toHaveBeenCalled();
   });
 
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/cards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.cardRequest.findFirst).not.toHaveBeenCalled();
+  });
+
   test("PATCH cancels only pending cards", async () => {
     (prisma.cardRequest.findFirst as unknown as jest.Mock).mockResolvedValue({
       id: "c1",
