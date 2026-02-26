@@ -35,3 +35,19 @@ Triage SLA for `needs-triage`:
 - Apply `release` for release PRs.
 - Apply one risk label (`risk:medium` or `risk:high`) when risk exceeds low.
 - Keep labels additive and explicit; avoid using `release` as a substitute for domain labels.
+
+## Canonical metadata (for restore automation)
+
+Use this mapping when recreating labels after accidental deletion/rename.
+
+| Label | Color | Description |
+|---|---|---|
+| `security` | `d73a4a` | Security hardening and vulnerability remediation |
+| `ci` | `1d76db` | CI/CD workflow and automation changes |
+| `dependencies` | `0366d6` | Dependency/version and lockfile updates |
+| `docs` | `0e8a16` | Documentation and runbook updates |
+| `release` | `5319e7` | Release planning, sign-off, and readiness |
+| `needs-triage` | `fbca04` | Requires owner assignment and initial classification |
+| `risk:low` | `0e8a16` | Low-risk change |
+| `risk:medium` | `fbca04` | Medium-risk change |
+| `risk:high` | `d73a4a` | High-risk or security-sensitive change |

@@ -162,17 +162,41 @@ Feature-dependent variables (set only if feature is enabled):
 Quick restore using GitHub CLI (`gh`) from repo root:
 
 ```bash
-for label in security ci dependencies docs release needs-triage risk:low risk:medium risk:high; do
-	gh label create "$label" --repo advancia-devuser/advancia-healthcare1 --color BFD4F2 --description "Governance label" || true
+labels=(
+	"security|d73a4a|Security hardening and vulnerability remediation"
+	"ci|1d76db|CI/CD workflow and automation changes"
+	"dependencies|0366d6|Dependency/version and lockfile updates"
+	"docs|0e8a16|Documentation and runbook updates"
+	"release|5319e7|Release planning, sign-off, and readiness"
+	"needs-triage|fbca04|Requires owner assignment and initial classification"
+	"risk:low|0e8a16|Low-risk change"
+	"risk:medium|fbca04|Medium-risk change"
+	"risk:high|d73a4a|High-risk or security-sensitive change"
+)
+
+for entry in "${labels[@]}"; do
+	IFS='|' read -r label color description <<< "$entry"
+	gh label create "$label" --repo advancia-devuser/advancia-healthcare1 --color "$color" --description "$description" || true
 done
 ```
 
 PowerShell equivalent:
 
 ```powershell
-$labels = @('security','ci','dependencies','docs','release','needs-triage','risk:low','risk:medium','risk:high')
+$labels = @(
+	@{ Name = 'security'; Color = 'd73a4a'; Description = 'Security hardening and vulnerability remediation' },
+	@{ Name = 'ci'; Color = '1d76db'; Description = 'CI/CD workflow and automation changes' },
+	@{ Name = 'dependencies'; Color = '0366d6'; Description = 'Dependency/version and lockfile updates' },
+	@{ Name = 'docs'; Color = '0e8a16'; Description = 'Documentation and runbook updates' },
+	@{ Name = 'release'; Color = '5319e7'; Description = 'Release planning, sign-off, and readiness' },
+	@{ Name = 'needs-triage'; Color = 'fbca04'; Description = 'Requires owner assignment and initial classification' },
+	@{ Name = 'risk:low'; Color = '0e8a16'; Description = 'Low-risk change' },
+	@{ Name = 'risk:medium'; Color = 'fbca04'; Description = 'Medium-risk change' },
+	@{ Name = 'risk:high'; Color = 'd73a4a'; Description = 'High-risk or security-sensitive change' }
+)
+
 foreach ($label in $labels) {
-	gh label create $label --repo advancia-devuser/advancia-healthcare1 --color BFD4F2 --description "Governance label" 2>$null
+	gh label create $label.Name --repo advancia-devuser/advancia-healthcare1 --color $label.Color --description $label.Description 2>$null
 }
 ```
 
