@@ -4,6 +4,11 @@ on:
   issues:
     types: [opened, edited, labeled, unlabeled, assigned, unassigned, reopened]
   workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Issue number to evaluate for manual triage auto-clear (optional)."
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -18,9 +23,29 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const issue = context.payload.issue;
+            let issue = context.payload.issue;
+
+            if (!issue && context.eventName === 'workflow_dispatch') {
+              const rawIssueNumber = String(context.payload.inputs?.issue_number || '').trim();
+              if (rawIssueNumber) {
+                const issueNumber = Number(rawIssueNumber);
+                if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
+                  core.setFailed(`Invalid workflow_dispatch input issue_number='${rawIssueNumber}'. Expected a positive integer.`);
+                  return;
+                }
+
+                const fetched = await github.rest.issues.get({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: issueNumber,
+                });
+                issue = fetched.data;
+                core.info(`Loaded issue #${issue.number} from workflow_dispatch input.`);
+              }
+            }
+
             if (!issue) {
-              core.info('No issue payload (workflow_dispatch). Skipping.');
+              core.info('No issue payload and no workflow_dispatch issue_number provided. Skipping.');
               return;
             }
 
@@ -43,7 +68,25 @@ jobs:
             const hasRisk = labels.some((name) => riskLabels.has(name));
             const hasDomain = labels.some((name) => domainLabels.has(name));
 
+            const summary = [];
+            summary.push('## Triage auto-clear summary');
+            summary.push('');
+            summary.push(`Issue: #${issue.number}`);
+            summary.push(`Has \`needs-triage\`: ${hasNeedsTriage ? 'yes' : 'no'}`);
+            summary.push(`Has assignee: ${hasAssignee ? 'yes' : 'no'}`);
+            summary.push(`Has risk label: ${hasRisk ? 'yes' : 'no'}`);
+            summary.push(`Has domain label: ${hasDomain ? 'yes' : 'no'}`);
+
+            if (!hasNeedsTriage) {
+              summary.push('Action: no-op (label not present).');
+              require('node:fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary.join('\n')}\n`);
+              core.info('Issue does not have needs-triage label. Nothing to do.');
+              return;
+            }
+
             if (!(hasAssignee && hasRisk && hasDomain)) {
+              summary.push('Action: no-op (classification incomplete).');
+              require('node:fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary.join('\n')}\n`);
               core.info(`Not ready: assignee=${hasAssignee}, risk=${hasRisk}, domain=${hasDomain}`);
               return;
             }
@@ -55,4 +98,6 @@ jobs:
               name: 'needs-triage',
             });
 
+            summary.push('Action: removed `needs-triage`.');
+            require('node:fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary.join('\n')}\n`);
             core.info(`Removed needs-triage from issue #${issue.number}`);
