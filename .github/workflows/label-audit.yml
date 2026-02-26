@@ -22,15 +22,15 @@ jobs:
         with:
           script: |
             const required = [
-              'security',
-              'ci',
-              'dependencies',
-              'docs',
-              'release',
-              'needs-triage',
-              'risk:low',
-              'risk:medium',
-              'risk:high',
+              { name: 'security', color: 'd73a4a', description: 'Security hardening and vulnerability remediation' },
+              { name: 'ci', color: '1d76db', description: 'CI/CD workflow and automation changes' },
+              { name: 'dependencies', color: '0366d6', description: 'Dependency/version and lockfile updates' },
+              { name: 'docs', color: '0e8a16', description: 'Documentation and runbook updates' },
+              { name: 'release', color: '5319e7', description: 'Release planning, sign-off, and readiness' },
+              { name: 'needs-triage', color: 'fbca04', description: 'Requires owner assignment and initial classification' },
+              { name: 'risk:low', color: '0e8a16', description: 'Low-risk change' },
+              { name: 'risk:medium', color: 'fbca04', description: 'Medium-risk change' },
+              { name: 'risk:high', color: 'd73a4a', description: 'High-risk or security-sensitive change' },
             ];
 
             const labels = await github.paginate(github.rest.issues.listLabelsForRepo, {
@@ -39,8 +39,8 @@ jobs:
               per_page: 100,
             });
 
-            const existing = new Set(labels.map((l) => l.name));
-            const missing = required.filter((name) => !existing.has(name));
+            const existingByName = new Map(labels.map((label) => [label.name, label]));
+            const missing = required.filter((label) => !existingByName.has(label.name));
 
             const lines = [];
             lines.push('## Label audit summary');
@@ -48,13 +48,29 @@ jobs:
             lines.push(`Required labels: ${required.length}`);
             lines.push(`Missing labels: ${missing.length}`);
             lines.push('');
-            lines.push('| Label | Status |');
-            lines.push('|---|---|');
-            for (const name of required) {
-              lines.push(`| ${name} | ${existing.has(name) ? '✅ present' : '❌ missing'} |`);
+            lines.push('| Label | Status | Expected color | Actual color | Expected description | Actual description |');
+            lines.push('|---|---|---|---|---|---|');
+            for (const expected of required) {
+              const actual = existingByName.get(expected.name);
+              const status = actual ? '✅ present' : '❌ missing';
+              const actualColor = actual?.color || '—';
+              const actualDescription = actual?.description || '—';
+              lines.push(`| ${expected.name} | ${status} | ${expected.color} | ${actualColor} | ${expected.description} | ${actualDescription} |`);
             }
+
+            if (missing.length > 0) {
+              lines.push('');
+              lines.push('### Missing label restore hints');
+              lines.push('');
+              lines.push('| Label | Color | Description |');
+              lines.push('|---|---|---|');
+              for (const label of missing) {
+                lines.push(`| ${label.name} | ${label.color} | ${label.description} |`);
+              }
+            }
+
             require('node:fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${lines.join('\n')}\n`);
 
             if (missing.length > 0) {
-              core.setFailed(`Missing required labels: ${missing.join(', ')}`);
+              core.setFailed(`Missing required labels: ${missing.map((label) => label.name).join(', ')}`);
             }
