@@ -71,6 +71,19 @@ describe("Budgets API", () => {
     expect(prisma.budget.create).not.toHaveBeenCalled();
   });
 
+  test("POST returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/budgets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.budget.create).not.toHaveBeenCalled();
+  });
+
   test("POST rejects invalid period order", async () => {
     const req = new Request("http://localhost:3000/api/budgets", {
       method: "POST",
@@ -133,6 +146,19 @@ describe("Budgets API", () => {
 
     expect(res.status).toBe(400);
     expect(prisma.budget.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/budgets", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.budget.findFirst).not.toHaveBeenCalled();
   });
 
   test("PATCH rejects invalid spentAmount", async () => {
@@ -202,6 +228,19 @@ describe("Budgets API", () => {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.budget.deleteMany).not.toHaveBeenCalled();
+  });
+
+  test("DELETE returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/budgets", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
     });
 
     const res = await DELETE(req);
