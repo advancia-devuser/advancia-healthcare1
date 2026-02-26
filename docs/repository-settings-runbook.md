@@ -165,3 +165,24 @@ When a PR is blocked by required checks, use this order:
 	- Confirm `STAGING_URL` exists in repo Actions variable/secret.
 	- Rerun workflow after updating missing values.
 6. Push fix branch and confirm all required checks are green before merge.
+
+## 8) Escalation triggers and handoff package
+
+Escalate to **platform owner** when:
+
+- A required workflow fails repeatedly after two clean reruns.
+- Branch protection checks are stuck in `Expected` state due to check-name drift.
+- Post-deploy verification fails after confirming `STAGING_URL` is present.
+
+Escalate to **security/dependency owner** when:
+
+- `Dependency Audit` reports `high` or `critical` vulnerabilities.
+- A vulnerability fix requires major-version upgrades or risk acceptance.
+
+Include this handoff package in the escalation note:
+
+- PR link and commit SHA.
+- Failing check name and run URL.
+- First failing log lines (copy/paste).
+- Commands run locally and their outputs summary.
+- What was already attempted (rerun count, dependency updates, config checks).
