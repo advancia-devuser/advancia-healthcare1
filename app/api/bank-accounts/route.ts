@@ -3,6 +3,38 @@ import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { encrypt } from "@/lib/crypto";
 
+type AccountType = "checking" | "savings";
+
+const ACCOUNT_TYPES = new Set<AccountType>(["checking", "savings"]);
+
+function normalizeNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  return normalizeNonEmptyString(value);
+}
+
+function normalizeAccountType(value: unknown): AccountType | null {
+  if (value === undefined || value === null || value === "") {
+    return "checking";
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const normalized = value.trim().toLowerCase();
+  return ACCOUNT_TYPES.has(normalized as AccountType) ? (normalized as AccountType) : null;
+}
+
 /**
  * GET /api/bank-accounts
  * Returns user's linked bank accounts.
@@ -39,27 +71,56 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const body = await request.json();
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    const { bankName, accountLast4, routingNumber, accountType, plaidAccessToken, plaidAccountId } = body;
+    const { bankName, accountLast4, routingNumber, accountType, plaidAccessToken, plaidAccountId } = body as {
+      bankName?: unknown;
+      accountLast4?: unknown;
+      routingNumber?: unknown;
+      accountType?: unknown;
+      plaidAccessToken?: unknown;
+      plaidAccountId?: unknown;
+    };
 
-    if (!bankName || !accountLast4) {
+    const normalizedBankName = normalizeNonEmptyString(bankName);
+    const normalizedAccountLast4 = normalizeNonEmptyString(accountLast4);
+    const normalizedRoutingNumber = normalizeOptionalString(routingNumber);
+    const normalizedAccountType = normalizeAccountType(accountType);
+    const normalizedPlaidAccessToken = normalizeOptionalString(plaidAccessToken);
+    const normalizedPlaidAccountId = normalizeOptionalString(plaidAccountId);
+
+    if (!normalizedBankName || !normalizedAccountLast4) {
       return NextResponse.json(
         { error: "bankName and accountLast4 are required" },
         { status: 400 }
       );
     }
 
+    if (!/^\d{4}$/.test(normalizedAccountLast4)) {
+      return NextResponse.json({ error: "accountLast4 must be exactly 4 digits" }, { status: 400 });
+    }
+
+    if (normalizedRoutingNumber && !/^\d{9}$/.test(normalizedRoutingNumber)) {
+      return NextResponse.json({ error: "routingNumber must be exactly 9 digits" }, { status: 400 });
+    }
+
+    if (!normalizedAccountType) {
+      return NextResponse.json({ error: "accountType must be checking or savings" }, { status: 400 });
+    }
+
     const account = await prisma.bankAccount.create({
       data: {
         userId: user.id,
-        bankName,
-        accountLast4,
-        routingNumber: routingNumber || null,
-        accountType: accountType || "checking",
-        plaidAccessToken: plaidAccessToken ? encrypt(plaidAccessToken) : null,
-        plaidAccountId: plaidAccountId || null,
-        status: plaidAccessToken ? "VERIFIED" : "PENDING_VERIFICATION",
+        bankName: normalizedBankName,
+        accountLast4: normalizedAccountLast4,
+        routingNumber: normalizedRoutingNumber,
+        accountType: normalizedAccountType,
+        plaidAccessToken: normalizedPlaidAccessToken ? encrypt(normalizedPlaidAccessToken) : null,
+        plaidAccountId: normalizedPlaidAccountId,
+        status: normalizedPlaidAccessToken ? "VERIFIED" : "PENDING_VERIFICATION",
       },
     });
 
@@ -70,9 +131,9 @@ export async function POST(request: Request) {
         action: "BANK_ACCOUNT_LINKED",
         meta: JSON.stringify({
           bankAccountId: account.id,
-          bankName,
-          accountLast4,
-          accountType: accountType || "checking",
+          bankName: normalizedBankName,
+          accountLast4: normalizedAccountLast4,
+          accountType: normalizedAccountType,
         }),
       },
     });
@@ -81,7 +142,7 @@ export async function POST(request: Request) {
       data: {
         userId: user.id,
         title: "Bank Account Linked",
-        body: `${bankName} account ending in ${accountLast4} has been linked`,
+        body: `${normalizedBankName} account ending in ${normalizedAccountLast4} has been linked`,
         channel: "IN_APP",
         meta: JSON.stringify({ bankAccountId: account.id }),
       },
@@ -114,14 +175,20 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const { accountId } = await request.json();
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    if (!accountId) {
+    const { accountId } = body as { accountId?: unknown };
+    const normalizedAccountId = normalizeNonEmptyString(accountId);
+
+    if (!normalizedAccountId) {
       return NextResponse.json({ error: "accountId is required" }, { status: 400 });
     }
 
     const account = await prisma.bankAccount.findFirst({
-      where: { id: accountId, userId: user.id },
+      where: { id: normalizedAccountId, userId: user.id },
     });
 
     if (!account) {
@@ -129,7 +196,7 @@ export async function DELETE(request: Request) {
     }
 
     await prisma.bankAccount.update({
-      where: { id: accountId },
+      where: { id: normalizedAccountId },
       data: { status: "REMOVED" },
     });
 
@@ -138,7 +205,7 @@ export async function DELETE(request: Request) {
         userId: user.id,
         actor: user.address,
         action: "BANK_ACCOUNT_REMOVED",
-        meta: JSON.stringify({ bankAccountId: accountId }),
+        meta: JSON.stringify({ bankAccountId: normalizedAccountId }),
       },
     });
 
