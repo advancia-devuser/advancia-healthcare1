@@ -78,6 +78,7 @@ Optional (strict governance metadata enforcement in `.github/workflows/label-aud
 
 - Repository variable: `LABEL_AUDIT_FAIL_ON_DRIFT=true`
 - Manual override: when running `Label Audit` via `workflow_dispatch`, set input `fail_on_drift` to `true` or `false` for that run (leave empty to use repository variable/default)
+- Audit summary includes `Drift mode source` so operators can confirm whether input, repository variable, or default determined enforcement
 
 CLI quick set/unset (`gh`) from repo root:
 

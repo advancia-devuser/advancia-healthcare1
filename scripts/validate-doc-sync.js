@@ -100,6 +100,8 @@ const mustContain = [
       "workflow_dispatch:",
       "inputs:",
       "github.event.inputs.fail_on_drift",
+      "Invalid workflow_dispatch input fail_on_drift",
+      "Drift mode source",
       "Verify governance labels exist",
       "security",
       "ci",
