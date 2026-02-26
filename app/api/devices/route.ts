@@ -2,6 +2,29 @@ import { NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+function normalizeNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  return normalizeNonEmptyString(value);
+}
+
+function sanitizeIpFromHeaders(request: Request): string | null {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  const realIp = request.headers.get("x-real-ip");
+  const rawIp = forwardedFor ? forwardedFor.split(",")[0] : realIp;
+  const normalized = normalizeOptionalString(rawIp);
+  return normalized;
+}
+
 /**
  * GET /api/devices
  * Returns user's registered devices/sessions.
@@ -28,8 +51,8 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ devices });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
@@ -45,46 +68,64 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { deviceName, deviceType, fingerprint, userAgent } = body;
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    if (!deviceName || !deviceType || !fingerprint) {
+    const { deviceName, deviceType, fingerprint, userAgent } = body as {
+      deviceName?: unknown;
+      deviceType?: unknown;
+      fingerprint?: unknown;
+      userAgent?: unknown;
+    };
+
+    const normalizedDeviceName = normalizeNonEmptyString(deviceName);
+    const normalizedDeviceType = normalizeNonEmptyString(deviceType);
+    const normalizedFingerprint = normalizeNonEmptyString(fingerprint);
+    const normalizedUserAgent = normalizeOptionalString(userAgent);
+
+    if (!normalizedDeviceName || !normalizedDeviceType || !normalizedFingerprint) {
       return NextResponse.json(
         { error: "deviceName, deviceType, and fingerprint are required" },
         { status: 400 }
       );
     }
 
+    if (normalizedFingerprint.length < 8) {
+      return NextResponse.json({ error: "fingerprint must be at least 8 characters" }, { status: 400 });
+    }
+
     // Get IP from headers
-    const ip = request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || null;
+    const ip = sanitizeIpFromHeaders(request);
 
     const device = await prisma.device.upsert({
       where: {
         userId_fingerprint: {
           userId: user.id,
-          fingerprint,
+          fingerprint: normalizedFingerprint,
         },
       },
       update: {
-        deviceName,
+        deviceName: normalizedDeviceName,
         lastActiveAt: new Date(),
         ipAddress: ip,
-        userAgent: userAgent || null,
+        userAgent: normalizedUserAgent,
         isActive: true,
       },
       create: {
         userId: user.id,
-        deviceName,
-        deviceType,
-        fingerprint,
+        deviceName: normalizedDeviceName,
+        deviceType: normalizedDeviceType,
+        fingerprint: normalizedFingerprint,
         ipAddress: ip,
-        userAgent: userAgent || null,
+        userAgent: normalizedUserAgent,
       },
     });
 
     return NextResponse.json({ device }, { status: 201 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
@@ -100,14 +141,20 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { deviceId } = await request.json();
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    if (!deviceId) {
+    const { deviceId } = body as { deviceId?: unknown };
+    const normalizedDeviceId = normalizeNonEmptyString(deviceId);
+
+    if (!normalizedDeviceId) {
       return NextResponse.json({ error: "deviceId is required" }, { status: 400 });
     }
 
     await prisma.device.updateMany({
-      where: { id: deviceId, userId: user.id },
+      where: { id: normalizedDeviceId, userId: user.id },
       data: { isActive: false },
     });
 
@@ -116,12 +163,12 @@ export async function DELETE(request: Request) {
         userId: user.id,
         actor: user.address,
         action: "DEVICE_REVOKED",
-        meta: JSON.stringify({ deviceId }),
+        meta: JSON.stringify({ deviceId: normalizedDeviceId }),
       },
     });
 
     return NextResponse.json({ success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
