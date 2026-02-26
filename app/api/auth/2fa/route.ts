@@ -14,13 +14,44 @@ import { requireApprovedUser } from "@/lib/auth";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { generateTotpSecret, verifyTotpCode, generateTotpUri } from "@/lib/totp";
 
+function normalizeNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized || null;
+}
+
+function normalizeAction(value: unknown): "setup" | "verify" | "disable" | null {
+  const normalized = normalizeNonEmptyString(value)?.toLowerCase();
+  if (normalized === "setup" || normalized === "verify" || normalized === "disable") {
+    return normalized;
+  }
+  return null;
+}
+
+function normalizeSixDigitCode(value: unknown): string | null {
+  const normalized = normalizeNonEmptyString(value);
+  if (!normalized || !/^\d{6}$/.test(normalized)) {
+    return null;
+  }
+  return normalized;
+}
+
 export async function POST(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const body = await request.json();
-    const { action, code } = body;
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+    const { action, code } = body as {
+      action?: unknown;
+      code?: unknown;
+    };
+    const normalizedAction = normalizeAction(action);
 
-    if (!action) {
+    if (!normalizedAction) {
       return NextResponse.json(
         { error: "action is required (setup | verify | disable)" },
         { status: 400 }
@@ -28,7 +59,7 @@ export async function POST(request: Request) {
     }
 
     /* ─── SETUP: Generate secret ─── */
-    if (action === "setup") {
+    if (normalizedAction === "setup") {
       if (user.twoFaEnabled) {
         return NextResponse.json(
           { error: "2FA is already enabled. Disable it first." },
@@ -59,8 +90,9 @@ export async function POST(request: Request) {
     }
 
     /* ─── VERIFY: Enable 2FA ─── */
-    if (action === "verify") {
-      if (!code || typeof code !== "string" || code.length !== 6) {
+    if (normalizedAction === "verify") {
+      const normalizedCode = normalizeSixDigitCode(code);
+      if (!normalizedCode) {
         return NextResponse.json(
           { error: "A 6-digit code is required" },
           { status: 400 }
@@ -75,7 +107,7 @@ export async function POST(request: Request) {
       }
 
       const secret = decrypt(user.twoFaSecret);
-      const valid = verifyTotpCode(secret, code);
+      const valid = verifyTotpCode(secret, normalizedCode);
 
       if (!valid) {
         return NextResponse.json(
@@ -110,7 +142,7 @@ export async function POST(request: Request) {
     }
 
     /* ─── DISABLE: Turn off 2FA ─── */
-    if (action === "disable") {
+    if (normalizedAction === "disable") {
       if (!user.twoFaEnabled) {
         return NextResponse.json(
           { error: "2FA is not enabled" },
@@ -118,15 +150,23 @@ export async function POST(request: Request) {
         );
       }
 
-      if (!code || typeof code !== "string" || code.length !== 6) {
+      const normalizedCode = normalizeSixDigitCode(code);
+      if (!normalizedCode) {
         return NextResponse.json(
           { error: "A 6-digit code is required to disable 2FA" },
           { status: 400 }
         );
       }
 
-      const secret = decrypt(user.twoFaSecret!);
-      const valid = verifyTotpCode(secret, code);
+      if (!user.twoFaSecret) {
+        return NextResponse.json(
+          { error: "No 2FA secret found. Call setup first." },
+          { status: 400 }
+        );
+      }
+
+      const secret = decrypt(user.twoFaSecret);
+      const valid = verifyTotpCode(secret, normalizedCode);
 
       if (!valid) {
         return NextResponse.json(
