@@ -93,6 +93,20 @@ gh variable set LABEL_AUDIT_FAIL_ON_DRIFT --body "true" --repo advancia-devuser/
 gh variable delete LABEL_AUDIT_FAIL_ON_DRIFT --repo advancia-devuser/advancia-healthcare1
 ```
 
+Manual dispatch override via GitHub CLI (`gh`):
+
+```bash
+gh workflow run label-audit.yml --repo advancia-devuser/advancia-healthcare1 -f fail_on_drift=true
+gh workflow run label-audit.yml --repo advancia-devuser/advancia-healthcare1 -f fail_on_drift=false
+```
+
+PowerShell (same commands):
+
+```powershell
+gh workflow run label-audit.yml --repo advancia-devuser/advancia-healthcare1 -f fail_on_drift=true
+gh workflow run label-audit.yml --repo advancia-devuser/advancia-healthcare1 -f fail_on_drift=false
+```
+
 ### Required for local/runtime app deployment
 
 Environment template: `.env.example`
