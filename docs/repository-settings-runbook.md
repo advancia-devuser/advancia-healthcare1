@@ -145,6 +145,7 @@ Feature-dependent variables (set only if feature is enabled):
 - Apply PR labels consistently using `docs/label-glossary.md`
 - Ensure `needs-triage` items receive owner + initial severity/domain classification within `1 business day`
 - Confirm reminder comments from `.github/workflows/triage-reminder.yml` are acted on and label is removed after triage
+- For manual reminder checks, run `.github/workflows/triage-reminder.yml` with optional `workflow_dispatch` inputs: `issue_number` (target one issue) and `hours_threshold` (default `24`)
 - Ensure `.github/workflows/triage-auto-clear.yml` can remove `needs-triage` once owner + risk + domain labels are set (domain examples: `bug`, `enhancement`, `security`, `dependencies`, `ci`, `docs`, `release`)
 - For manual remediation, run `.github/workflows/triage-auto-clear.yml` with `workflow_dispatch` input `issue_number` to evaluate a specific issue on demand
 - Keep `.github/workflows/label-audit.yml` enabled for `pull_request` and `push` to `main`, and use monthly/manual runs for periodic governance audits
@@ -174,6 +175,12 @@ Feature-dependent variables (set only if feature is enabled):
 - Symptom: checker reports missing references or missing required files.
 - Likely cause: docs/workflow file moved, renamed, or referenced path not updated.
 - Fix: update docs links and required references, then run `npm run check:docs-sync` locally.
+
+### `Triage Reminder` `workflow_dispatch` input validation fails
+
+- Symptom: workflow reports invalid `issue_number` or `hours_threshold`.
+- Likely cause: non-numeric/invalid manual input values.
+- Fix: set `issue_number` to a positive integer and `hours_threshold` to a positive number (or leave defaults).
 
 ### `Label Audit / Verify governance labels exist` fails
 

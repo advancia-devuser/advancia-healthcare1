@@ -4,6 +4,15 @@ on:
   schedule:
     - cron: "0 * * * *"
   workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "Optional issue number to evaluate for reminder."
+        required: false
+        default: ""
+      hours_threshold:
+        description: "Age threshold in hours before reminder (default 24)."
+        required: false
+        default: "24"
 
 permissions:
   contents: read
@@ -19,23 +28,63 @@ jobs:
         with:
           script: |
             const marker = '<!-- needs-triage-reminder -->';
-            const cutoffMs = 24 * 60 * 60 * 1000;
+            const rawHours = String(context.payload.inputs?.hours_threshold || '24').trim();
+            const parsedHours = Number(rawHours);
+            if (!Number.isFinite(parsedHours) || parsedHours <= 0) {
+              core.setFailed(`Invalid workflow_dispatch input hours_threshold='${rawHours}'. Expected a positive number.`);
+              return;
+            }
+
+            const cutoffMs = parsedHours * 60 * 60 * 1000;
             const cutoff = Date.now() - cutoffMs;
 
-            const issues = await github.paginate(github.rest.issues.listForRepo, {
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'needs-triage',
-              per_page: 100,
-            });
+            const rawIssueNumber = String(context.payload.inputs?.issue_number || '').trim();
+            const issues = [];
+
+            if (rawIssueNumber) {
+              const issueNumber = Number(rawIssueNumber);
+              if (!Number.isInteger(issueNumber) || issueNumber <= 0) {
+                core.setFailed(`Invalid workflow_dispatch input issue_number='${rawIssueNumber}'. Expected a positive integer.`);
+                return;
+              }
+
+              const issueRes = await github.rest.issues.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issueNumber,
+              });
+              issues.push(issueRes.data);
+            } else {
+              const fetched = await github.paginate(github.rest.issues.listForRepo, {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: 'needs-triage',
+                per_page: 100,
+              });
+              issues.push(...fetched);
+            }
 
             let reminded = 0;
+            let evaluated = 0;
+            let staleEligible = 0;
+            let alreadyCommentedCount = 0;
+            let notEligibleCount = 0;
 
             for (const issue of issues) {
               if (issue.pull_request) continue;
+              const labels = (issue.labels || []).map((l) => (typeof l === 'string' ? l : l.name));
+              if (!labels.includes('needs-triage')) continue;
+
+              evaluated += 1;
+
               const createdAt = new Date(issue.created_at).getTime();
-              if (createdAt > cutoff) continue;
+              if (createdAt > cutoff) {
+                notEligibleCount += 1;
+                continue;
+              }
+
+              staleEligible += 1;
 
               const comments = await github.paginate(github.rest.issues.listComments, {
                 owner: context.repo.owner,
@@ -45,16 +94,33 @@ jobs:
               });
 
               const alreadyCommented = comments.some((c) => c.body && c.body.includes(marker));
-              if (alreadyCommented) continue;
+              if (alreadyCommented) {
+                alreadyCommentedCount += 1;
+                continue;
+              }
 
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
-                body: `${marker}\nThis issue has been labeled \`needs-triage\` for over 24 hours.\n\nPlease assign an owner and set initial severity/domain classification per \`docs/label-glossary.md\`.`,
+                body: `${marker}\nThis issue has been labeled \`needs-triage\` for over ${parsedHours} hours.\n\nPlease assign an owner and set initial severity/domain classification per \`docs/label-glossary.md\`.`,
               });
 
               reminded += 1;
             }
+
+            const summary = [];
+            summary.push('## Triage reminder summary');
+            summary.push('');
+            summary.push(`Hours threshold: ${parsedHours}`);
+            summary.push(`Evaluated needs-triage issues: ${evaluated}`);
+            summary.push(`Stale eligible issues: ${staleEligible}`);
+            summary.push(`Already reminded (marker found): ${alreadyCommentedCount}`);
+            summary.push(`Not yet stale: ${notEligibleCount}`);
+            summary.push(`Reminders posted: ${reminded}`);
+            if (rawIssueNumber) {
+              summary.push(`Manual issue scope: #${rawIssueNumber}`);
+            }
+            require('node:fs').appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary.join('\n')}\n`);
 
             core.info(`Triage reminders posted: ${reminded}`);

@@ -138,6 +138,19 @@ const mustContain = [
     ],
   },
   {
+    file: ".github/workflows/triage-reminder.yml",
+    values: [
+      "workflow_dispatch:",
+      "issue_number:",
+      "hours_threshold:",
+      "Invalid workflow_dispatch input issue_number",
+      "Invalid workflow_dispatch input hours_threshold",
+      "Triage reminder summary",
+      "Hours threshold:",
+      "Reminders posted:",
+    ],
+  },
+  {
     file: ".github/ISSUE_TEMPLATE/bug_report.yml",
     values: ["docs/label-glossary.md"],
   },
