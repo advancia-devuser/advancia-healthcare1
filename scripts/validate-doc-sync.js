@@ -35,6 +35,7 @@ const mustContain = [
       ".github/workflows/label-audit.yml",
       "LABEL_AUDIT_FAIL_ON_DRIFT",
       "fail_on_drift",
+      "gh workflow run label-audit.yml",
       ".github/workflows/triage-auto-clear.yml",
       ".github/workflows/triage-reminder.yml",
       ".github/dependabot.yml",
