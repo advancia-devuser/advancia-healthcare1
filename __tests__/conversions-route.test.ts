@@ -76,10 +76,41 @@ describe("Conversions API", () => {
     expect(debitWallet).not.toHaveBeenCalled();
   });
 
+  test("POST returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/conversions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
   test("POST returns 400 when quote API returns no quote", async () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: false,
       json: async () => ({ error: "quote unavailable" }),
+    } as never);
+
+    const req = new Request("http://localhost:3000/api/conversions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromAsset: "ETH", toAsset: "USDC", fromAmount: "100", chainId: 421614 }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST returns 400 when quote payload is malformed", async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ quote: { toAmount: "0", rate: "99", fee: "10", source: "mock" } }),
     } as never);
 
     const req = new Request("http://localhost:3000/api/conversions", {
