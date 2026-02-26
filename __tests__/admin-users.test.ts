@@ -75,6 +75,18 @@ describe("Admin Users API", () => {
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await PATCH(req);
+    expect(res.status).toBe(400);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
   test("PATCH returns 404 when user is missing", async () => {
     const notFoundError = new Prisma.PrismaClientKnownRequestError("Record not found", {
       code: "P2025",
