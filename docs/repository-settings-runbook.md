@@ -78,6 +78,20 @@ Optional (strict governance metadata enforcement in `.github/workflows/label-aud
 
 - Repository variable: `LABEL_AUDIT_FAIL_ON_DRIFT=true`
 
+CLI quick set/unset (`gh`) from repo root:
+
+```bash
+gh variable set LABEL_AUDIT_FAIL_ON_DRIFT --body "true" --repo advancia-devuser/advancia-healthcare1
+gh variable delete LABEL_AUDIT_FAIL_ON_DRIFT --repo advancia-devuser/advancia-healthcare1
+```
+
+PowerShell equivalent:
+
+```powershell
+gh variable set LABEL_AUDIT_FAIL_ON_DRIFT --body "true" --repo advancia-devuser/advancia-healthcare1
+gh variable delete LABEL_AUDIT_FAIL_ON_DRIFT --repo advancia-devuser/advancia-healthcare1
+```
+
 ### Required for local/runtime app deployment
 
 Environment template: `.env.example`
