@@ -70,6 +70,19 @@ describe("Gift Cards API", () => {
     expect(debitWallet).not.toHaveBeenCalled();
   });
 
+  test("POST returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/gift-cards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
   test("POST rejects invalid chainId", async () => {
     const req = new Request("http://localhost:3000/api/gift-cards", {
       method: "POST",
@@ -140,6 +153,19 @@ describe("Gift Cards API", () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cardId: "gc1", redeemAmount: "0" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.giftCard.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/gift-cards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
     });
 
     const res = await PATCH(req);
