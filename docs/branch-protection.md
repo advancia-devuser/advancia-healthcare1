@@ -24,6 +24,7 @@ Set these as required checks (exact names):
 - `CI Tests / Env validation tests`
 - `CI Tests / Unit/API tests (excluding env group)`
 - `Dependency Audit / npm audit (high/critical gate)`
+- `Docs Consistency / Validate docs/workflow sync`
 
 If you use staged deployment validation, also require this check for release branches/environments:
 
@@ -45,6 +46,7 @@ If you use staged deployment validation, also require this check for release bra
     - `CI Tests / Env validation tests`
     - `CI Tests / Unit/API tests (excluding env group)`
     - `Dependency Audit / npm audit (high/critical gate)`
+    - `Docs Consistency / Validate docs/workflow sync`
   - Enable **Require branches to be up to date before merging**
 - Enable **Require conversation resolution before merging**
 - Enable **Include administrators**
@@ -62,4 +64,5 @@ If you use staged deployment validation, also require this check for release bra
 - Code owner review depends on `.github/CODEOWNERS` being present and valid.
 - `Verify staging deployment` is from `.github/workflows/post-deploy-verify.yml` and depends on `STAGING_URL` being configured.
 - `npm audit (high/critical gate)` is from `.github/workflows/dependency-audit.yml`.
+- `Validate docs/workflow sync` is from `.github/workflows/docs-consistency.yml`.
 - If you make it required but `STAGING_URL` is missing, merges will block.

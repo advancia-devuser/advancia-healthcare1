@@ -13,6 +13,7 @@ Required status checks to add (exact names):
 - `CI Tests / Env validation tests`
 - `CI Tests / Unit/API tests (excluding env group)`
 - `Dependency Audit / npm audit (high/critical gate)`
+- `Docs Consistency / Validate docs/workflow sync`
 
 Optional by environment/release flow:
 
@@ -62,6 +63,7 @@ Feature-dependent variables (set only if feature is enabled):
 
 - CI tests: `.github/workflows/ci-tests.yml`
 - Dependency audit gate: `.github/workflows/dependency-audit.yml`
+- Docs/workflow consistency gate: `.github/workflows/docs-consistency.yml`
 - Post-deploy verification: `.github/workflows/post-deploy-verify.yml`
 - Dependabot updates: `.github/dependabot.yml`
 
