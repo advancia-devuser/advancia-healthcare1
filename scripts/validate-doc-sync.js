@@ -58,6 +58,18 @@ const mustContain = [
       ".github/workflows/triage-reminder.yml",
       ".github/workflows/post-deploy-verify.yml",
       ".github/dependabot.yml",
+      "gh variable set LABEL_AUDIT_FAIL_ON_DRIFT",
+      "gh variable delete LABEL_AUDIT_FAIL_ON_DRIFT",
+    ],
+  },
+  {
+    file: "docs/label-glossary.md",
+    values: [
+      "Canonical metadata (for restore automation)",
+      "| Label | Color | Description |",
+      "risk:high",
+      "d73a4a",
+      "fbca04",
     ],
   },
   {
