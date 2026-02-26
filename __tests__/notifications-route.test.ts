@@ -75,6 +75,19 @@ describe("Notifications API", () => {
     );
   });
 
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.notification.updateMany).not.toHaveBeenCalled();
+  });
+
   test("PATCH marks specific notification ids read", async () => {
     (prisma.notification.updateMany as unknown as jest.Mock).mockResolvedValue({ count: 2 });
 
@@ -112,6 +125,19 @@ describe("Notifications API", () => {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.notification.deleteMany).not.toHaveBeenCalled();
+  });
+
+  test("DELETE returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
     });
 
     const res = await DELETE(req);
