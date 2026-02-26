@@ -34,6 +34,7 @@ const mustContain = [
       ".github/workflows/dependency-audit.yml",
       ".github/workflows/label-audit.yml",
       "LABEL_AUDIT_FAIL_ON_DRIFT",
+      "fail_on_drift",
       ".github/workflows/triage-auto-clear.yml",
       ".github/workflows/triage-reminder.yml",
       ".github/dependabot.yml",
@@ -54,6 +55,7 @@ const mustContain = [
       ".github/workflows/dependency-audit.yml",
       ".github/workflows/label-audit.yml",
       "LABEL_AUDIT_FAIL_ON_DRIFT",
+      "fail_on_drift",
       ".github/workflows/triage-auto-clear.yml",
       ".github/workflows/triage-reminder.yml",
       ".github/workflows/post-deploy-verify.yml",
@@ -92,6 +94,7 @@ const mustContain = [
     file: ".github/workflows/label-audit.yml",
     values: [
       "LABEL_AUDIT_FAIL_ON_DRIFT",
+      "fail_on_drift",
       "Verify governance labels exist",
       "security",
       "ci",
