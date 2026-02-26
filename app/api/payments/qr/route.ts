@@ -3,6 +3,96 @@ import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { transferInternal } from "@/lib/ledger";
 
+type QrPaymentData = {
+  type: "smartwallet-pay";
+  recipient: string;
+  amount?: string | null;
+  asset?: string;
+  note?: string | null;
+  chainId?: number;
+  requestId?: string;
+};
+
+function normalizeNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function parsePositiveIntString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!/^\d+$/.test(trimmed)) {
+    return null;
+  }
+
+  try {
+    const bigintValue = BigInt(trimmed);
+    return bigintValue > BigInt(0) ? bigintValue.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+function parseChainId(value: unknown, fallback: number): number {
+  const parsed =
+    typeof value === "number" ? Math.trunc(value) : Number.parseInt(String(value ?? ""), 10);
+
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+
+  return parsed;
+}
+
+function parseQrPaymentData(qrData: string): QrPaymentData | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(qrData);
+  } catch {
+    return null;
+  }
+
+  if (!parsed || typeof parsed !== "object") {
+    return null;
+  }
+
+  const candidate = parsed as Record<string, unknown>;
+  if (candidate.type !== "smartwallet-pay") {
+    return null;
+  }
+
+  const recipient = normalizeNonEmptyString(candidate.recipient);
+  if (!recipient) {
+    return null;
+  }
+
+  const amount =
+    candidate.amount === undefined || candidate.amount === null
+      ? null
+      : parsePositiveIntString(String(candidate.amount));
+
+  if (candidate.amount !== undefined && candidate.amount !== null && !amount) {
+    return null;
+  }
+
+  return {
+    type: "smartwallet-pay",
+    recipient,
+    amount,
+    asset: normalizeNonEmptyString(candidate.asset) || "ETH",
+    note: normalizeNonEmptyString(candidate.note) || null,
+    chainId: parseChainId(candidate.chainId, 421614),
+    requestId: normalizeNonEmptyString(candidate.requestId) || undefined,
+  };
+}
+
 /**
  * GET /api/payments/qr?amount=...&asset=ETH
  * Generate a QR payment request (returns data for QR code).
@@ -11,9 +101,14 @@ export async function GET(request: Request) {
   try {
     const user = await requireApprovedUser(request);
     const { searchParams } = new URL(request.url);
-    const amount = searchParams.get("amount");
-    const asset = searchParams.get("asset") || "ETH";
-    const note = searchParams.get("note") || "";
+    const rawAmount = searchParams.get("amount");
+    const amount = rawAmount ? parsePositiveIntString(rawAmount) : null;
+    if (rawAmount && !amount) {
+      return NextResponse.json({ error: "amount must be a positive integer string" }, { status: 400 });
+    }
+
+    const asset = normalizeNonEmptyString(searchParams.get("asset")) || "ETH";
+    const note = normalizeNonEmptyString(searchParams.get("note")) || "";
 
     const wallet = await prisma.wallet.findUnique({
       where: { userId: user.id },
@@ -58,22 +153,39 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const body = await request.json();
-    const { qrData, confirm = false, pin } = body;
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    if (!qrData) {
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const { qrData, confirm = false, pin } = body as {
+      qrData?: unknown;
+      confirm?: unknown;
+      pin?: unknown;
+    };
+
+    const normalizedQrData = normalizeNonEmptyString(qrData);
+    if (!normalizedQrData) {
       return NextResponse.json({ error: "qrData is required" }, { status: 400 });
     }
 
-    let paymentData: any;
-    try {
-      paymentData = JSON.parse(qrData);
-    } catch {
-      return NextResponse.json({ error: "Invalid QR data" }, { status: 400 });
+    if (typeof confirm !== "boolean") {
+      return NextResponse.json({ error: "confirm must be a boolean" }, { status: 400 });
     }
 
-    if (paymentData.type !== "smartwallet-pay") {
-      return NextResponse.json({ error: "Unsupported QR code type" }, { status: 400 });
+    if (pin !== undefined && pin !== null && typeof pin !== "string") {
+      return NextResponse.json({ error: "pin must be a string" }, { status: 400 });
+    }
+
+    const paymentData = parseQrPaymentData(normalizedQrData);
+    if (!paymentData) {
+      return NextResponse.json({ error: "Invalid QR data" }, { status: 400 });
     }
 
     // Look up a persisted PaymentRequest for this requestId (if any)
@@ -107,8 +219,8 @@ export async function POST(request: Request) {
         parsed: true,
         recipient: paymentData.recipient,
         amount: paymentData.amount,
-        asset: paymentData.asset || "ETH",
-        note: paymentData.note || null,
+        asset: paymentData.asset,
+        note: paymentData.note,
         chainId: paymentData.chainId,
         requestId: paymentData.requestId,
         hasPersistedRequest: !!persistedRequest,
@@ -123,15 +235,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const recipientAddress: string = paymentData.recipient;
-    if (!recipientAddress) {
-      return NextResponse.json({ error: "Recipient address missing from QR data" }, { status: 400 });
-    }
+    const recipientAddress = paymentData.recipient.toLowerCase();
 
     // Verify PIN if user has one set
     if (user.pin) {
       const { verifyUserPin } = await import("@/lib/pin-verify");
-      const pinError = await verifyUserPin(user as any, pin);
+      const pinError = await verifyUserPin({ id: user.id, pin: user.pin }, pin);
       if (pinError) return pinError;
     }
 
@@ -161,11 +270,11 @@ export async function POST(request: Request) {
       fromUserId: user.id,
       toUserId: recipientUser.id,
       asset: paymentData.asset || "ETH",
-      amount: String(paymentData.amount),
+      amount: paymentData.amount,
       chainId: paymentData.chainId || 421614,
       meta: {
         initiatedBy: user.address,
-        recipientAddress: recipientAddress.toLowerCase(),
+        recipientAddress,
         source: "QR_PAYMENT",
         requestId: paymentData.requestId || null,
       },
@@ -223,9 +332,8 @@ export async function POST(request: Request) {
     );
   } catch (res) {
     if (res instanceof Response) return res;
-    const err = res as any;
-    if (err?.message?.includes("Insufficient balance")) {
-      return NextResponse.json({ error: err.message }, { status: 400 });
+    if (res instanceof Error && res.message.includes("Insufficient balance")) {
+      return NextResponse.json({ error: res.message }, { status: 400 });
     }
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
