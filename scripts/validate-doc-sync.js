@@ -64,6 +64,7 @@ const mustContain = [
       "gh variable set LABEL_AUDIT_FAIL_ON_DRIFT",
       "gh variable delete LABEL_AUDIT_FAIL_ON_DRIFT",
       "gh workflow run label-audit.yml",
+      "must be exactly `true` or `false`",
     ],
   },
   {
@@ -105,6 +106,7 @@ const mustContain = [
       "inputRaw || repoRaw || 'false'",
       "Invalid workflow_dispatch input fail_on_drift",
       "Drift mode source",
+      "Enforce failure by setting workflow_dispatch input fail_on_drift=true",
       "Verify governance labels exist",
       "security",
       "ci",
