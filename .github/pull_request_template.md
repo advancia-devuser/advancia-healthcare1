@@ -49,6 +49,12 @@ Test evidence (paste relevant output):
 
 - [ ] Completed `docs/release-signoff-template.md` and attached to this PR (or linked equivalent release notes)
 
+## Labels
+
+- [ ] Added at least one domain label (e.g., `dependencies`, `security`, `ci`, `docs`)
+- [ ] If this is a release PR, added `release`
+- [ ] If risk is medium/high, added `risk:medium` or `risk:high`
+
 ## References
 
 - Branch protection policy: `docs/branch-protection.md`
