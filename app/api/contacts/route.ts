@@ -2,6 +2,29 @@ import { NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+function normalizeNonEmptyString(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  return normalizeNonEmptyString(value);
+}
+
+function normalizeSearch(value: string | null): string {
+  return (value || "").trim();
+}
+
+function isLikelyEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
 /**
  * GET /api/contacts?search=...
  * Returns user's contact / address book.
@@ -10,9 +33,17 @@ export async function GET(request: Request) {
   try {
     const user = await requireApprovedUser(request);
     const { searchParams } = new URL(request.url);
-    const search = searchParams.get("search") || "";
+    const search = normalizeSearch(searchParams.get("search"));
 
-    const where: any = { userId: user.id };
+    const where: {
+      userId: string;
+      OR?: Array<
+        | { name: { contains: string } }
+        | { address: { contains: string } }
+        | { email: { contains: string } }
+      >;
+    } = { userId: user.id };
+
     if (search) {
       where.OR = [
         { name: { contains: search } },
@@ -41,38 +72,61 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const body = await request.json();
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    const { name, address, email, phone, isFavorite } = body;
+    const { name, address, email, phone, isFavorite } = body as {
+      name?: unknown;
+      address?: unknown;
+      email?: unknown;
+      phone?: unknown;
+      isFavorite?: unknown;
+    };
 
-    if (!name || !address) {
+    const normalizedName = normalizeNonEmptyString(name);
+    const normalizedAddress = normalizeNonEmptyString(address);
+    const normalizedEmail = normalizeOptionalString(email);
+    const normalizedPhone = normalizeOptionalString(phone);
+
+    if (!normalizedName || !normalizedAddress) {
       return NextResponse.json(
         { error: "name and address are required" },
         { status: 400 }
       );
     }
 
+    if (normalizedEmail && !isLikelyEmail(normalizedEmail)) {
+      return NextResponse.json({ error: "email must be a valid email address" }, { status: 400 });
+    }
+
     const contact = await prisma.contact.create({
       data: {
         userId: user.id,
-        name,
-        address: address.toLowerCase(),
-        email: email || null,
-        phone: phone || null,
-        isFavorite: !!isFavorite,
+        name: normalizedName,
+        address: normalizedAddress.toLowerCase(),
+        email: normalizedEmail,
+        phone: normalizedPhone,
+        isFavorite: isFavorite === true,
       },
     });
 
     return NextResponse.json({ contact }, { status: 201 });
-  } catch (err: any) {
+  } catch (err) {
     if (err instanceof Response) return err;
-    if (err.code === "P2002") {
+    if (
+      typeof err === "object" &&
+      err !== null &&
+      "code" in err &&
+      (err as { code?: string }).code === "P2002"
+    ) {
       return NextResponse.json(
         { error: "Contact with this address already exists" },
         { status: 409 }
       );
     }
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
 
@@ -83,14 +137,20 @@ export async function POST(request: Request) {
 export async function DELETE(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const { contactId } = await request.json();
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    if (!contactId) {
+    const { contactId } = body as { contactId?: unknown };
+    const normalizedContactId = normalizeNonEmptyString(contactId);
+
+    if (!normalizedContactId) {
       return NextResponse.json({ error: "contactId is required" }, { status: 400 });
     }
 
     await prisma.contact.deleteMany({
-      where: { id: contactId, userId: user.id },
+      where: { id: normalizedContactId, userId: user.id },
     });
 
     return NextResponse.json({ success: true });
