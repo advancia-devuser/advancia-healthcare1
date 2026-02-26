@@ -13,6 +13,16 @@ import { isAdminRequest } from "@/lib/auth";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { generateTotpSecret, verifyTotpCode, generateTotpUri } from "@/lib/totp";
 
+type Admin2FAAction = "setup" | "verify" | "disable" | "status";
+
+function isAdmin2FAAction(value: unknown): value is Admin2FAAction {
+  return value === "setup" || value === "verify" || value === "disable" || value === "status";
+}
+
+function isSixDigitCode(value: unknown): value is string {
+  return typeof value === "string" && /^\d{6}$/.test(value);
+}
+
 export async function POST(request: Request) {
   const isAdmin = await isAdminRequest();
   if (!isAdmin) {
@@ -20,17 +30,23 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { action, code } = await request.json();
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    if (!action) {
+    const { action, code } = body as { action?: unknown; code?: unknown };
+    const normalizedAction = typeof action === "string" ? action.trim().toLowerCase() : action;
+
+    if (!isAdmin2FAAction(normalizedAction)) {
       return NextResponse.json(
-        { error: "action is required (setup | verify | disable | status)" },
+        { error: "Invalid action. Use setup, verify, disable, or status." },
         { status: 400 }
       );
     }
 
     /* ─── STATUS: Check if 2FA is enabled ─── */
-    if (action === "status") {
+    if (normalizedAction === "status") {
       const config = await prisma.adminConfig.findUnique({
         where: { key: "admin_totp_secret" },
       });
@@ -38,7 +54,7 @@ export async function POST(request: Request) {
     }
 
     /* ─── SETUP: Generate new TOTP secret ─── */
-    if (action === "setup") {
+    if (normalizedAction === "setup") {
       const existing = await prisma.adminConfig.findUnique({
         where: { key: "admin_totp_secret" },
       });
@@ -68,8 +84,8 @@ export async function POST(request: Request) {
     }
 
     /* ─── VERIFY: Confirm and enable 2FA ─── */
-    if (action === "verify") {
-      if (!code || typeof code !== "string" || code.length !== 6) {
+    if (normalizedAction === "verify") {
+      if (!isSixDigitCode(code)) {
         return NextResponse.json(
           { error: "A 6-digit code is required" },
           { status: 400 }
@@ -112,8 +128,8 @@ export async function POST(request: Request) {
     }
 
     /* ─── DISABLE: Turn off 2FA ─── */
-    if (action === "disable") {
-      if (!code || typeof code !== "string" || code.length !== 6) {
+    if (normalizedAction === "disable") {
+      if (!isSixDigitCode(code)) {
         return NextResponse.json(
           { error: "A 6-digit code is required to disable 2FA" },
           { status: 400 }
@@ -146,11 +162,6 @@ export async function POST(request: Request) {
 
       return NextResponse.json({ enabled: false, message: "Admin 2FA has been disabled." });
     }
-
-    return NextResponse.json(
-      { error: "Invalid action. Use setup, verify, disable, or status." },
-      { status: 400 }
-    );
   } catch (e) {
     console.error("Admin 2FA error:", e);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
