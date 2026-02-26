@@ -59,6 +59,7 @@ If you use staged deployment validation, also require this check for release bra
 - Restrict who can push to matching branches
 - Restrict who can dismiss pull request reviews
 - Add `Label Audit / Verify governance labels exist` as a required check for governance-strict repos
+- Set repository variable `LABEL_AUDIT_FAIL_ON_DRIFT=true` to make metadata drift fail `Label Audit` (otherwise drift is warning-only)
 
 ## Notes
 
@@ -67,4 +68,5 @@ If you use staged deployment validation, also require this check for release bra
 - `npm audit (high/critical gate)` is from `.github/workflows/dependency-audit.yml`.
 - `Validate docs/workflow sync` is from `.github/workflows/docs-consistency.yml`.
 - `Verify governance labels exist` is from `.github/workflows/label-audit.yml`.
+- `LABEL_AUDIT_FAIL_ON_DRIFT` can be configured in repository Actions variables to enforce fail-on-drift behavior for label metadata.
 - If you make it required but `STAGING_URL` is missing, merges will block.
