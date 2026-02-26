@@ -112,6 +112,7 @@ Feature-dependent variables (set only if feature is enabled):
 - Keep Dependabot PRs enabled and review weekly batch updates
 - Treat high/critical dependency findings as merge blockers
 - Revisit unresolved moderate advisories when upstream fixable versions are released
+- Apply PR labels consistently using `docs/label-glossary.md`
 
 ## 6) Troubleshooting (common failures)
 

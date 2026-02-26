@@ -176,6 +176,7 @@ CI workflow:
 - Repository settings runbook: `docs/repository-settings-runbook.md`
 - Release readiness checklist: `docs/release-readiness-checklist.md`
 - Release sign-off template: `docs/release-signoff-template.md`
+- Label glossary: `docs/label-glossary.md`
 - Short PR description template: `docs/pr-description-short.md`
 - PR template: `.github/pull_request_template.md`
 - Issue templates: `.github/ISSUE_TEMPLATE/` (bug, security, change request)

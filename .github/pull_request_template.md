@@ -61,5 +61,6 @@ Test evidence (paste relevant output):
 - Repository settings runbook: `docs/repository-settings-runbook.md`
 - Release readiness checklist: `docs/release-readiness-checklist.md`
 - Release sign-off template: `docs/release-signoff-template.md`
+- Label glossary: `docs/label-glossary.md`
 - CI workflow: `.github/workflows/ci-tests.yml`
 - Post-deploy workflow: `.github/workflows/post-deploy-verify.yml`
