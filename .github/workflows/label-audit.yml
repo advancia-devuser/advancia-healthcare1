@@ -7,6 +7,11 @@ on:
   schedule:
     - cron: "0 10 1 * *"
   workflow_dispatch:
+    inputs:
+      fail_on_drift:
+        description: "Override drift enforcement for this run (true/false)."
+        required: false
+        default: ""
 
 permissions:
   contents: read
@@ -20,7 +25,7 @@ jobs:
       - name: Check required labels
         uses: actions/github-script@v7
         env:
-          LABEL_AUDIT_FAIL_ON_DRIFT: ${{ vars.LABEL_AUDIT_FAIL_ON_DRIFT }}
+          LABEL_AUDIT_FAIL_ON_DRIFT: ${{ github.event.inputs.fail_on_drift || vars.LABEL_AUDIT_FAIL_ON_DRIFT }}
         with:
           script: |
             const required = [

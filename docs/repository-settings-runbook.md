@@ -77,6 +77,7 @@ Optional (enables admin positive-path checks in the same workflow):
 Optional (strict governance metadata enforcement in `.github/workflows/label-audit.yml`):
 
 - Repository variable: `LABEL_AUDIT_FAIL_ON_DRIFT=true`
+- Manual override: when running `Label Audit` via `workflow_dispatch`, set input `fail_on_drift` to `true` or `false` for that run
 
 CLI quick set/unset (`gh`) from repo root:
 
