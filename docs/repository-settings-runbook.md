@@ -186,3 +186,17 @@ Include this handoff package in the escalation note:
 - First failing log lines (copy/paste).
 - Commands run locally and their outputs summary.
 - What was already attempted (rerun count, dependency updates, config checks).
+
+## 9) Severity SLA targets
+
+| Severity | Initial acknowledgment | Containment/fix target | Owner |
+|---|---:|---:|---|
+| Critical | 1 hour | Same business day | Security + Platform |
+| High | 4 hours | 1 business day | Security/Dependency owner |
+| Moderate | 1 business day | Planned in next dependency cycle | Dependency owner |
+| Low | 2 business days | Backlog / opportunistic | Feature or dependency owner |
+
+Notes:
+
+- SLA targets are operational goals; use judgment for holidays and release freezes.
+- Any severity affecting production auth/session integrity should be treated at least as `high`.
