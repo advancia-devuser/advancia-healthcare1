@@ -14,6 +14,23 @@ import { decrypt } from "@/lib/crypto";
 import { compare } from "bcryptjs";
 import { assertAdminPasswordEnv } from "@/lib/env";
 
+function isSixDigitCode(value: string) {
+  return /^\d{6}$/.test(value);
+}
+
+function normalizeOptionalString(value: unknown): string | undefined {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+
+  if (typeof value !== "string") {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed || undefined;
+}
+
 /**
  * POST /api/admin/login
  * Body: { password: string, totpCode?: string }
@@ -42,7 +59,23 @@ export async function POST(request: Request) {
       );
     }
 
-    const { password, totpCode } = await request.json();
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const { password, totpCode: rawTotpCode } = body as {
+      password?: unknown;
+      totpCode?: unknown;
+    };
+
+    const normalizedTotpCode = normalizeOptionalString(rawTotpCode);
 
     const expectedHash = process.env.ADMIN_PASSWORD_HASH;
     const expectedPlain = process.env.ADMIN_PASSWORD;
@@ -84,15 +117,24 @@ export async function POST(request: Request) {
 
     if (totpConfig?.value) {
       // 2FA is enabled — require TOTP code
-      if (!totpCode || typeof totpCode !== "string") {
+      if (!normalizedTotpCode) {
         return NextResponse.json(
           { error: "2FA code required", requires2FA: true },
           { status: 403 }
         );
       }
 
+      if (!isSixDigitCode(normalizedTotpCode)) {
+        const { lockMs } = await registerAdminFailure(ip);
+        const retryAfter = lockMs > 0 ? Math.ceil(lockMs / 1000) : undefined;
+        return NextResponse.json(
+          { error: "Invalid 2FA code", requires2FA: true, ...(retryAfter ? { retryAfter } : {}) },
+          { status: 401, ...(retryAfter ? { headers: { "Retry-After": String(retryAfter) } } : {}) }
+        );
+      }
+
       const secret = decrypt(totpConfig.value);
-      const valid = verifyTotpCode(secret, totpCode);
+      const valid = verifyTotpCode(secret, normalizedTotpCode);
       if (!valid) {
         const { lockMs } = await registerAdminFailure(ip);
         const retryAfter = lockMs > 0 ? Math.ceil(lockMs / 1000) : undefined;
@@ -117,8 +159,8 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Internal error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Admin login error:", err);
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
