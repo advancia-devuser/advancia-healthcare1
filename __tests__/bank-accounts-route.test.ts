@@ -65,6 +65,19 @@ describe("Bank Accounts API", () => {
     expect(prisma.bankAccount.create).not.toHaveBeenCalled();
   });
 
+  test("POST returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/bank-accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.bankAccount.create).not.toHaveBeenCalled();
+  });
+
   test("POST rejects invalid routing number", async () => {
     const req = new Request("http://localhost:3000/api/bank-accounts", {
       method: "POST",
@@ -165,6 +178,19 @@ describe("Bank Accounts API", () => {
       method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.bankAccount.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("DELETE returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/bank-accounts", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
     });
 
     const res = await DELETE(req);
