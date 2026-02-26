@@ -33,6 +33,7 @@ const mustContain = [
       "docs/label-glossary.md",
       ".github/workflows/dependency-audit.yml",
       ".github/workflows/label-audit.yml",
+      "LABEL_AUDIT_FAIL_ON_DRIFT",
       ".github/workflows/triage-auto-clear.yml",
       ".github/workflows/triage-reminder.yml",
       ".github/dependabot.yml",
@@ -40,7 +41,7 @@ const mustContain = [
   },
   {
     file: "docs/branch-protection.md",
-    values: ["docs/repository-settings-runbook.md"],
+    values: ["docs/repository-settings-runbook.md", "LABEL_AUDIT_FAIL_ON_DRIFT"],
   },
   {
     file: "docs/repository-settings-runbook.md",
@@ -52,11 +53,28 @@ const mustContain = [
       ".github/workflows/ci-tests.yml",
       ".github/workflows/dependency-audit.yml",
       ".github/workflows/label-audit.yml",
+      "LABEL_AUDIT_FAIL_ON_DRIFT",
       ".github/workflows/triage-auto-clear.yml",
       ".github/workflows/triage-reminder.yml",
       ".github/workflows/post-deploy-verify.yml",
       ".github/dependabot.yml",
     ],
+  },
+  {
+    file: "docs/release-signoff-template.md",
+    values: ["LABEL_AUDIT_FAIL_ON_DRIFT", "Label Audit / Verify governance labels exist"],
+  },
+  {
+    file: ".github/pull_request_template.md",
+    values: ["LABEL_AUDIT_FAIL_ON_DRIFT", "Label Audit / Verify governance labels exist"],
+  },
+  {
+    file: "docs/pr-description-short.md",
+    values: ["LABEL_AUDIT_FAIL_ON_DRIFT", "Label Audit / Verify governance labels exist"],
+  },
+  {
+    file: ".github/workflows/label-audit.yml",
+    values: ["LABEL_AUDIT_FAIL_ON_DRIFT", "Verify governance labels exist"],
   },
   {
     file: ".github/ISSUE_TEMPLATE/bug_report.yml",
