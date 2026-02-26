@@ -138,3 +138,22 @@ Feature-dependent variables (set only if feature is enabled):
 - Symptom: checker reports missing references or missing required files.
 - Likely cause: docs/workflow file moved, renamed, or referenced path not updated.
 - Fix: update docs links and required references, then run `npm run check:docs-sync` locally.
+
+## 7) CI first-response playbook
+
+When a PR is blocked by required checks, use this order:
+
+1. Open failing check summary and copy first actionable error line.
+2. If `CI Tests` failed:
+	- Reproduce locally with `npm test`.
+	- Fix test or update test fixture; rerun until green.
+3. If `Dependency Audit` failed:
+	- Run `npm audit --json`.
+	- Address high/critical findings first, rerun tests.
+4. If `Docs Consistency` failed:
+	- Run `npm run check:docs-sync`.
+	- Add missing links/references reported by script.
+5. If `Post-Deploy Verify` failed:
+	- Confirm `STAGING_URL` exists in repo Actions variable/secret.
+	- Rerun workflow after updating missing values.
+6. Push fix branch and confirm all required checks are green before merge.
