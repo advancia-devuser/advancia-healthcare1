@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "check:docs-sync": "node scripts/validate-doc-sync.js",
     "hash:admin": "node scripts/generate-admin-password-hash.js",
     "trigger:post-deploy:dispatch": "bash scripts/trigger-post-deploy-verify.sh",
     "trigger:post-deploy:dispatch:ps": "pwsh -File scripts/trigger-post-deploy-verify.ps1",

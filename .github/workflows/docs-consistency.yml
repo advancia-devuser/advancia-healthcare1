@@ -1,0 +1,40 @@
+name: Docs Consistency
+
+on:
+  pull_request:
+    paths:
+      - README.md
+      - docs/**
+      - .github/workflows/**
+      - .github/dependabot.yml
+      - scripts/validate-doc-sync.js
+      - package.json
+  push:
+    branches: [main]
+    paths:
+      - README.md
+      - docs/**
+      - .github/workflows/**
+      - .github/dependabot.yml
+      - scripts/validate-doc-sync.js
+      - package.json
+
+jobs:
+  docs-consistency:
+    name: Validate docs/workflow sync
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate docs/workflow consistency
+        run: npm run check:docs-sync
