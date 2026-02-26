@@ -134,5 +134,5 @@ jobs:
             }
 
             if (drift.length > 0) {
-              core.warning(`Label metadata drift detected for: ${drift.map((item) => item.name).join(', ')}. Set LABEL_AUDIT_FAIL_ON_DRIFT=true to enforce failure.`);
+              core.warning(`Label metadata drift detected for: ${drift.map((item) => item.name).join(', ')}. Enforce failure by setting workflow_dispatch input fail_on_drift=true for this run or LABEL_AUDIT_FAIL_ON_DRIFT=true at repository level.`);
             }

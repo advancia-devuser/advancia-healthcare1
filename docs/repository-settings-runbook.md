@@ -196,6 +196,7 @@ Feature-dependent variables (set only if feature is enabled):
 - Likely cause: labels were deleted/renamed in repository settings.
 - Fix: recreate missing labels, then rerun the workflow.
 - Optional strict metadata enforcement: set repository variable `LABEL_AUDIT_FAIL_ON_DRIFT=true` to fail when label color/description differs from canonical metadata.
+- If `workflow_dispatch` input `fail_on_drift` is provided, it must be exactly `true` or `false` (empty means fallback to variable/default).
 
 Quick restore using GitHub CLI (`gh`) from repo root:
 
