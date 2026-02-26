@@ -96,6 +96,7 @@ Feature-dependent variables (set only if feature is enabled):
 - Dependency audit gate: `.github/workflows/dependency-audit.yml`
 - Needs-triage reminder: `.github/workflows/triage-reminder.yml`
 - Needs-triage auto-clear: `.github/workflows/triage-auto-clear.yml`
+- Label governance audit: `.github/workflows/label-audit.yml`
 - Docs/workflow consistency gate: `.github/workflows/docs-consistency.yml`
 - Post-deploy verification: `.github/workflows/post-deploy-verify.yml`
 - Dependabot updates: `.github/dependabot.yml`
@@ -118,6 +119,7 @@ Feature-dependent variables (set only if feature is enabled):
 - Ensure `needs-triage` items receive owner + initial severity/domain classification within `1 business day`
 - Confirm reminder comments from `.github/workflows/triage-reminder.yml` are acted on and label is removed after triage
 - Ensure `.github/workflows/triage-auto-clear.yml` can remove `needs-triage` once owner + risk + domain labels are set
+- Run `.github/workflows/label-audit.yml` monthly/on-demand to verify required label set is intact
 
 ## 6) Troubleshooting (common failures)
 

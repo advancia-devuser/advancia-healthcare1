@@ -173,6 +173,7 @@ CI workflow:
 - Dependency audit workflow: `.github/workflows/dependency-audit.yml` (weekly + manual + package manifest changes on `main`; blocks only on high/critical)
 - Triage reminder workflow: `.github/workflows/triage-reminder.yml` (hourly reminder comment for open `needs-triage` issues older than 24h)
 - Triage auto-clear workflow: `.github/workflows/triage-auto-clear.yml` (removes `needs-triage` when owner + risk + domain labels are present)
+- Label audit workflow: `.github/workflows/label-audit.yml` (monthly/manual check that required governance labels exist)
 - Dependabot configuration: `.github/dependabot.yml` (weekly npm + GitHub Actions updates, grouped to reduce PR noise)
 - Branch protection setup guide: `docs/branch-protection.md`
 - Repository settings runbook: `docs/repository-settings-runbook.md`
