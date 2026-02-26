@@ -40,6 +40,18 @@ Optional by environment/release flow:
 
 ## 2) Required repository variables and secrets
 
+### Verify variables/secrets in ~60 seconds (UI)
+
+1. Open GitHub repo → `Settings`.
+2. Open `Secrets and variables` → `Actions`.
+3. In **Variables**, verify at least one staging target is present:
+	- `STAGING_URL`
+4. In **Secrets**, verify either `STAGING_URL` exists or the variable above is set.
+5. In **Secrets**, verify optional admin checks if used:
+	- `STAGING_ADMIN_PASSWORD`
+	- `STAGING_ADMIN_TOTP`
+6. Save any missing values, then run `Post-Deploy Verify` via `workflow_dispatch`.
+
 ### Required for post-deploy verification workflow
 
 Workflow file: `.github/workflows/post-deploy-verify.yml`
