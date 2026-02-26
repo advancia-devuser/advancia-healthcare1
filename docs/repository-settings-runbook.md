@@ -40,7 +40,9 @@ Optional for governance-strict repos:
 	- `CI Tests / Unit/API tests (excluding env group)`
 	- `Dependency Audit / npm audit (high/critical gate)`
 	- `Docs Consistency / Validate docs/workflow sync`
-5. Save changes.
+5. Optional for governance-strict repos: also add
+	- `Label Audit / Verify governance labels exist`
+6. Save changes.
 
 ## 2) Required repository variables and secrets
 
