@@ -175,6 +175,7 @@ CI workflow:
 - Branch protection setup guide: `docs/branch-protection.md`
 - Repository settings runbook: `docs/repository-settings-runbook.md`
 - Release readiness checklist: `docs/release-readiness-checklist.md`
+- Release sign-off template: `docs/release-signoff-template.md`
 - Short PR description template: `docs/pr-description-short.md`
 - PR template: `.github/pull_request_template.md`
 - Issue templates: `.github/ISSUE_TEMPLATE/` (bug, security, change request)

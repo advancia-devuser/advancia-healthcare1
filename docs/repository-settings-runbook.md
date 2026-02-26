@@ -206,3 +206,4 @@ Notes:
 Before shipping, run through:
 
 - `docs/release-readiness-checklist.md`
+- `docs/release-signoff-template.md`
