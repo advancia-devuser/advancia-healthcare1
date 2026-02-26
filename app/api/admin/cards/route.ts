@@ -1,6 +1,24 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { Prisma, RequestStatus } from "@prisma/client";
+
+const REQUEST_STATUS_VALUES = new Set<RequestStatus>([
+  RequestStatus.PENDING,
+  RequestStatus.APPROVED,
+  RequestStatus.REJECTED,
+]);
+
+type AdminCardAction = "APPROVE" | "REJECT";
+const ADMIN_CARD_ACTION_VALUES = new Set<AdminCardAction>(["APPROVE", "REJECT"]);
+
+function isAdminCardAction(value: unknown): value is AdminCardAction {
+  return typeof value === "string" && ADMIN_CARD_ACTION_VALUES.has(value as AdminCardAction);
+}
+
+function isRequestStatus(value: unknown): value is RequestStatus {
+  return typeof value === "string" && REQUEST_STATUS_VALUES.has(value as RequestStatus);
+}
 
 /**
  * GET /api/admin/cards?status=PENDING
@@ -12,9 +30,19 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status") || undefined;
+    const rawStatus = searchParams.get("status");
+    const candidateStatus = rawStatus ? rawStatus.trim().toUpperCase() : undefined;
 
-    const where: any = {};
+    if (candidateStatus && !isRequestStatus(candidateStatus)) {
+      return NextResponse.json(
+        { error: "Invalid status. Allowed values: PENDING, APPROVED, REJECTED" },
+        { status: 400 }
+      );
+    }
+
+    const status: RequestStatus | undefined = candidateStatus;
+
+    const where: { status?: RequestStatus } = {};
     if (status) where.status = status;
 
     const cards = await prisma.cardRequest.findMany({
@@ -24,7 +52,7 @@ export async function GET(request: Request) {
     });
 
     return NextResponse.json({ cards });
-  } catch (err: any) {
+  } catch {
     return NextResponse.json({ error: "Failed to fetch cards" }, { status: 500 });
   }
 }
@@ -39,10 +67,31 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const { cardId, action, last4 } = await request.json();
-    if (!cardId || !action) {
+    const body: unknown = await request.json();
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const { cardId, action, last4 } = body as {
+      cardId?: unknown;
+      action?: unknown;
+      last4?: unknown;
+    };
+
+    if (typeof cardId !== "string" || !cardId.trim()) {
+      return NextResponse.json({ error: "cardId is required" }, { status: 400 });
+    }
+
+    if (!isAdminCardAction(action)) {
       return NextResponse.json(
-        { error: "cardId and action are required" },
+        { error: "Invalid action. Allowed values: APPROVE, REJECT" },
+        { status: 400 }
+      );
+    }
+
+    if (last4 !== undefined && last4 !== null && (typeof last4 !== "string" || !/^\d{4}$/.test(last4))) {
+      return NextResponse.json(
+        { error: "last4 must be a 4-digit string when provided" },
         { status: 400 }
       );
     }
@@ -50,9 +99,9 @@ export async function PATCH(request: Request) {
     const newStatus = action === "APPROVE" ? "APPROVED" : "REJECTED";
 
     const card = await prisma.cardRequest.update({
-      where: { id: cardId },
+      where: { id: cardId.trim() },
       data: {
-        status: newStatus as any,
+        status: newStatus,
         last4: action === "APPROVE" ? last4 || null : undefined,
         decidedAt: new Date(),
       },
@@ -63,12 +112,15 @@ export async function PATCH(request: Request) {
         userId: card.userId,
         actor: "ADMIN",
         action: `CARD_${action}`,
-        meta: JSON.stringify({ cardId, last4 }),
+        meta: JSON.stringify({ cardId: card.id, action, ...(action === "APPROVE" ? { last4: last4 || null } : {}) }),
       },
     });
 
     return NextResponse.json({ card });
-  } catch (err: any) {
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+      return NextResponse.json({ error: "Card request not found" }, { status: 404 });
+    }
     return NextResponse.json({ error: "Failed to update card" }, { status: 500 });
   }
 }
