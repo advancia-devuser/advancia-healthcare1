@@ -17,6 +17,12 @@ Use these labels consistently on PRs/issues for triage and reporting.
 
 - `needs-triage` — new issue/PR requires initial owner assignment and severity/domain classification.
 
+Triage SLA for `needs-triage`:
+
+- Assign an owner within `1 business day`.
+- Set severity/domain classification within `1 business day`.
+- Remove `needs-triage` once owner + initial classification are set.
+
 ## Risk labels
 
 - `risk:medium` — non-trivial behavior/config impact, requires focused review and validation.

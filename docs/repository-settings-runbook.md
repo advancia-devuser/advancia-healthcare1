@@ -113,6 +113,7 @@ Feature-dependent variables (set only if feature is enabled):
 - Treat high/critical dependency findings as merge blockers
 - Revisit unresolved moderate advisories when upstream fixable versions are released
 - Apply PR labels consistently using `docs/label-glossary.md`
+- Ensure `needs-triage` items receive owner + initial severity/domain classification within `1 business day`
 
 ## 6) Troubleshooting (common failures)
 
