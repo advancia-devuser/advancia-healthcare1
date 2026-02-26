@@ -68,6 +68,19 @@ describe("Payments Request API", () => {
     expect(prisma.paymentRequest.create).not.toHaveBeenCalled();
   });
 
+  test("POST returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/payments/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.paymentRequest.create).not.toHaveBeenCalled();
+  });
+
   test("POST rejects invalid expiresIn", async () => {
     const req = new Request("http://localhost:3000/api/payments/request", {
       method: "POST",
@@ -112,6 +125,19 @@ describe("Payments Request API", () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ requestId: "r1", action: "EXPIRE" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.paymentRequest.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/payments/request", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
     });
 
     const res = await PATCH(req);
