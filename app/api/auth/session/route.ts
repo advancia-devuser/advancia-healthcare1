@@ -22,6 +22,39 @@ import {
 import { prisma } from "@/lib/db";
 import { verifyMessage } from "viem";
 
+function normalizeAddress(value: unknown): `0x${string}` | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!/^0x[a-f0-9]{40}$/.test(normalized)) {
+    return null;
+  }
+  return normalized as `0x${string}`;
+}
+
+function normalizeHexSignature(value: unknown): `0x${string}` | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  if (!/^0x[a-fA-F0-9]+$/.test(normalized)) {
+    return null;
+  }
+  return normalized as `0x${string}`;
+}
+
+function normalizeNonce(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  if (!/^[a-f0-9]{64}$/.test(normalized)) {
+    return null;
+  }
+  return normalized;
+}
+
 function generateNonce(): string {
   const array = new Uint8Array(32);
   crypto.getRandomValues(array);
@@ -34,9 +67,9 @@ function generateNonce(): string {
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const address = searchParams.get("address")?.toLowerCase();
+  const address = normalizeAddress(searchParams.get("address"));
   if (!address) {
-    return NextResponse.json({ error: "address query param required" }, { status: 400 });
+    return NextResponse.json({ error: "valid address query param required" }, { status: 400 });
   }
   const nonce = generateNonce();
   await storeAuthNonce(address, nonce, 5 * 60_000);
@@ -58,17 +91,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Too many attempts. Try later." }, { status: 429 });
     }
 
-    const { address, signature, nonce } = await request.json();
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    if (!address || typeof address !== "string") {
+    const { address, signature, nonce } = body as {
+      address?: unknown;
+      signature?: unknown;
+      nonce?: unknown;
+    };
+
+    const normalizedAddress = normalizeAddress(address);
+    const normalizedSignature = normalizeHexSignature(signature);
+    const normalizedNonce = normalizeNonce(nonce);
+
+    if (!normalizedAddress) {
       return NextResponse.json({ error: "address is required" }, { status: 400 });
     }
 
-    const lower = address.toLowerCase();
+    if (!normalizedSignature || !normalizedNonce) {
+      return NextResponse.json({ error: "signature and nonce are required" }, { status: 400 });
+    }
+
+    const lower = normalizedAddress;
 
     // Verify and consume one-time nonce
     const storedNonce = await consumeAuthNonce(lower);
-    if (!storedNonce || storedNonce !== nonce) {
+    if (!storedNonce || storedNonce !== normalizedNonce) {
       return NextResponse.json(
         { error: "Invalid or expired nonce. Request a new one via GET." },
         { status: 401 }
@@ -76,13 +126,13 @@ export async function POST(request: Request) {
     }
 
     // Verify signature (EIP-191 personal sign)
-    const message = `Sign this message to verify your wallet ownership.\n\nNonce: ${nonce}`;
+    const message = `Sign this message to verify your wallet ownership.\n\nNonce: ${normalizedNonce}`;
     let isValid = false;
     try {
       isValid = await verifyMessage({
-        address: lower as `0x${string}`,
+        address: lower,
         message,
-        signature: signature as `0x${string}`,
+        signature: normalizedSignature,
       });
     } catch {
       isValid = false;
