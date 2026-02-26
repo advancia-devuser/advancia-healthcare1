@@ -1,7 +1,7 @@
 name: Change Request
 description: Propose an enhancement or workflow/process improvement
 title: "[Change]: "
-labels: ["enhancement"]
+labels: ["enhancement", "needs-triage"]
 body:
   - type: markdown
     attributes:

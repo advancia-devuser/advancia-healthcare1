@@ -13,6 +13,10 @@ Use these labels consistently on PRs/issues for triage and reporting.
 
 - `release` — release preparation, release notes/sign-off, deployment readiness work.
 
+## Triage labels
+
+- `needs-triage` — new issue/PR requires initial owner assignment and severity/domain classification.
+
 ## Risk labels
 
 - `risk:medium` — non-trivial behavior/config impact, requires focused review and validation.
