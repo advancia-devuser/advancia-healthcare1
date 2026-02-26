@@ -141,6 +141,14 @@ Feature-dependent variables (set only if feature is enabled):
 
 ## 7) CI first-response playbook
 
+| Failing check | Likely owner | First local command |
+|---|---|---|
+| `CI Tests / Env validation tests` | Backend/platform engineer | `npx jest --config jest.config.cjs --runInBand __tests__/env.test.ts` |
+| `CI Tests / Unit/API tests (excluding env group)` | Feature owner of changed code | `npm test` |
+| `Dependency Audit / npm audit (high/critical gate)` | Dependency/security owner | `npm audit --json` |
+| `Docs Consistency / Validate docs/workflow sync` | Docs/DevEx owner | `npm run check:docs-sync` |
+| `Post-Deploy Verify / Verify staging deployment` | Release/platform owner | `bash scripts/post-deploy-verify.sh <STAGING_URL>` |
+
 When a PR is blocked by required checks, use this order:
 
 1. Open failing check summary and copy first actionable error line.
