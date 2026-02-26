@@ -14,6 +14,11 @@ import { getAuthUser, checkRateLimitPersistent, getClientIP } from "@/lib/auth";
 import { randomBytes } from "crypto";
 import { sendVerificationEmail } from "@/lib/email";
 
+function normalizeNonEmptyString(value: unknown): string {
+  if (typeof value !== "string") return "";
+  return value.trim();
+}
+
 function normalizeCode(value: unknown): string {
   if (typeof value !== "string") return "";
   return value.trim().toUpperCase();
@@ -25,13 +30,21 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    const body = await request.json();
-    const { action, token } = body;
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const { action, token } = body as {
+      action?: unknown;
+      token?: unknown;
+    };
+    const normalizedAction = normalizeNonEmptyString(action);
 
     // Rate limit (3 sends per 10 min, 5 verifies per min)
     const ip = getClientIP(request);
 
-    if (!action) {
+    if (!normalizedAction) {
       return NextResponse.json(
         { error: "action is required (send | verify)" },
         { status: 400 }
@@ -39,7 +52,7 @@ export async function POST(request: Request) {
     }
 
     /* ─── SEND: Generate verification token ─── */
-    if (action === "send") {
+    if (normalizedAction === "send") {
       if (!(await checkRateLimitPersistent(`email-send:${user.id}`, 3, 10 * 60_000))) {
         return NextResponse.json(
           { error: "Too many requests. Try again later." },
@@ -98,7 +111,7 @@ export async function POST(request: Request) {
     }
 
     /* ─── VERIFY: Confirm the token ─── */
-    if (action === "verify") {
+    if (normalizedAction === "verify") {
       if (!(await checkRateLimitPersistent(`email-verify:${user.id}:${ip}`, 5, 60_000))) {
         return NextResponse.json(
           { error: "Too many attempts. Try again in a minute." },

@@ -66,6 +66,46 @@ describe("Email Verification API", () => {
     expect((sendVerificationEmail as unknown as jest.Mock).mock.calls[0][1]).toBe(savedToken);
   });
 
+  test("returns 400 for malformed JSON request body", async () => {
+    (getAuthUser as unknown as jest.Mock).mockResolvedValue({
+      id: "u1",
+      address: "0xabc",
+      email: "test@example.com",
+      emailVerified: false,
+      status: "PENDING",
+    });
+
+    const req = new Request("http://localhost:3000/api/auth/verify-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  test("returns 400 for invalid action type", async () => {
+    (getAuthUser as unknown as jest.Mock).mockResolvedValue({
+      id: "u1",
+      address: "0xabc",
+      email: "test@example.com",
+      emailVerified: false,
+      status: "PENDING",
+    });
+
+    const req = new Request("http://localhost:3000/api/auth/verify-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: 123, token: "ABCDEF12" }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
   test("verify accepts case-insensitive code and auto-approves PENDING user", async () => {
     (getAuthUser as unknown as jest.Mock).mockResolvedValue({
       id: "u1",
