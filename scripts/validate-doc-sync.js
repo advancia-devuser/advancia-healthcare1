@@ -10,6 +10,7 @@ const mustExist = [
   ".github/dependabot.yml",
   "docs/branch-protection.md",
   "docs/repository-settings-runbook.md",
+  "docs/release-readiness-checklist.md",
   "README.md",
 ];
 
@@ -19,6 +20,7 @@ const mustContain = [
     values: [
       "docs/branch-protection.md",
       "docs/repository-settings-runbook.md",
+      "docs/release-readiness-checklist.md",
       ".github/workflows/dependency-audit.yml",
       ".github/dependabot.yml",
     ],
@@ -31,6 +33,7 @@ const mustContain = [
     file: "docs/repository-settings-runbook.md",
     values: [
       "docs/branch-protection.md",
+      "docs/release-readiness-checklist.md",
       ".github/workflows/ci-tests.yml",
       ".github/workflows/dependency-audit.yml",
       ".github/workflows/post-deploy-verify.yml",

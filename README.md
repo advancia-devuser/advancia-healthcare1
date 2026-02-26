@@ -174,6 +174,7 @@ CI workflow:
 - Dependabot configuration: `.github/dependabot.yml` (weekly npm + GitHub Actions updates, grouped to reduce PR noise)
 - Branch protection setup guide: `docs/branch-protection.md`
 - Repository settings runbook: `docs/repository-settings-runbook.md`
+- Release readiness checklist: `docs/release-readiness-checklist.md`
 - Short PR description template: `docs/pr-description-short.md`
 - PR template: `.github/pull_request_template.md`
 - Issue templates: `.github/ISSUE_TEMPLATE/` (bug, security, change request)

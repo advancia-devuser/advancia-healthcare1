@@ -200,3 +200,9 @@ Notes:
 
 - SLA targets are operational goals; use judgment for holidays and release freezes.
 - Any severity affecting production auth/session integrity should be treated at least as `high`.
+
+## 10) Release gate
+
+Before shipping, run through:
+
+- `docs/release-readiness-checklist.md`
