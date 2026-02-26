@@ -172,6 +172,7 @@ CI workflow:
 - Splits `__tests__/env.test.ts` into its own job (`env-validation-tests`) and runs remaining tests in `unit-tests`
 - Dependency audit workflow: `.github/workflows/dependency-audit.yml` (weekly + manual + package manifest changes on `main`; blocks only on high/critical)
 - Triage reminder workflow: `.github/workflows/triage-reminder.yml` (hourly reminder comment for open `needs-triage` issues older than 24h)
+  - Manual trigger examples: `gh workflow run triage-reminder.yml --repo advancia-devuser/advancia-healthcare1 -f issue_number=123 -f hours_threshold=24` or `-f hours_threshold=48`
 - Triage auto-clear workflow: `.github/workflows/triage-auto-clear.yml` (removes `needs-triage` when owner + risk + domain labels are present)
 - Label audit workflow: `.github/workflows/label-audit.yml` (runs on PRs, pushes to `main`, monthly schedule, and manual dispatch to verify required governance labels exist; set `LABEL_AUDIT_FAIL_ON_DRIFT=true` to fail on color/description drift, or override per manual run with `fail_on_drift` input)
   - Precedence: manual `fail_on_drift` input (if set) → `LABEL_AUDIT_FAIL_ON_DRIFT` repository variable → default `false`

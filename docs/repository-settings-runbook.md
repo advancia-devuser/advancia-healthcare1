@@ -182,6 +182,13 @@ Feature-dependent variables (set only if feature is enabled):
 - Likely cause: non-numeric/invalid manual input values.
 - Fix: set `issue_number` to a positive integer and `hours_threshold` to a positive number (or leave defaults).
 
+Manual run examples:
+
+```bash
+gh workflow run triage-reminder.yml --repo advancia-devuser/advancia-healthcare1 -f issue_number=123 -f hours_threshold=24
+gh workflow run triage-reminder.yml --repo advancia-devuser/advancia-healthcare1 -f hours_threshold=48
+```
+
 ### `Label Audit / Verify governance labels exist` fails
 
 - Symptom: workflow summary lists missing governance labels.
