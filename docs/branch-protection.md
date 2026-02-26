@@ -19,12 +19,13 @@ Use this as the minimum policy for `main` in GitHub repository settings.
 
 Set these as required checks (exact names):
 
-- `Env validation tests`
-- `Unit/API tests (excluding env group)`
+- `CI Tests / Env validation tests`
+- `CI Tests / Unit/API tests (excluding env group)`
+- `Dependency Audit / npm audit (high/critical gate)`
 
 If you use staged deployment validation, also require this check for release branches/environments:
 
-- `Verify staging deployment`
+- `Post-Deploy Verify / Verify staging deployment`
 
 ## GitHub settings path
 
@@ -39,8 +40,9 @@ If you use staged deployment validation, also require this check for release bra
   - Enable **Dismiss stale pull request approvals when new commits are pushed**
 - Enable **Require status checks to pass before merging**
   - Required checks:
-    - `Env validation tests`
-    - `Unit/API tests (excluding env group)`
+    - `CI Tests / Env validation tests`
+    - `CI Tests / Unit/API tests (excluding env group)`
+    - `Dependency Audit / npm audit (high/critical gate)`
   - Enable **Require branches to be up to date before merging**
 - Enable **Require conversation resolution before merging**
 - Enable **Include administrators**
@@ -57,4 +59,5 @@ If you use staged deployment validation, also require this check for release bra
 
 - Code owner review depends on `.github/CODEOWNERS` being present and valid.
 - `Verify staging deployment` is from `.github/workflows/post-deploy-verify.yml` and depends on `STAGING_URL` being configured.
+- `npm audit (high/critical gate)` is from `.github/workflows/dependency-audit.yml`.
 - If you make it required but `STAGING_URL` is missing, merges will block.
