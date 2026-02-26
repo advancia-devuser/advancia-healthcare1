@@ -4,6 +4,36 @@ import { signUserToken, checkRateLimitPersistent, getClientIP } from "@/lib/auth
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 
+function normalizeEmail(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (!normalized || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) {
+    return null;
+  }
+  return normalized;
+}
+
+function normalizePassword(value: unknown): string | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized ? normalized : null;
+}
+
+function normalizeOptionalName(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") {
+    return null;
+  }
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized || null;
+}
+
 /**
  * POST /api/auth/email/register
  * Body: { email: string, password: string, name?: string }
@@ -16,23 +46,40 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Too many attempts. Try later." }, { status: 429 });
     }
 
-    const { email, password, name } = await request.json();
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    if (!email || typeof email !== "string") {
+    const { email, password, name } = body as {
+      email?: unknown;
+      password?: unknown;
+      name?: unknown;
+    };
+
+    const normalizedEmail = normalizeEmail(email);
+    const normalizedPassword = normalizePassword(password);
+    const normalizedName = normalizeOptionalName(name);
+
+    if (!normalizedEmail) {
       return NextResponse.json({ error: "Email is required" }, { status: 400 });
     }
-    if (!password || typeof password !== "string" || password.length < 6) {
+    if (!normalizedPassword || normalizedPassword.length < 6) {
       return NextResponse.json({ error: "Password must be at least 6 characters" }, { status: 400 });
     }
 
+    if (name !== undefined && normalizedName === null) {
+      return NextResponse.json({ error: "Name must be a non-empty string when provided" }, { status: 400 });
+    }
+
     // Check if email already exists
-    const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    const existing = await prisma.user.findUnique({ where: { email: normalizedEmail } });
     if (existing) {
       return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 });
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await bcrypt.hash(normalizedPassword, 12);
 
     // Generate a placeholder address for email-only users
     const placeholderAddress = `email-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -40,9 +87,9 @@ export async function POST(request: Request) {
     // Create user
     const user = await prisma.user.create({
       data: {
-        email: email.toLowerCase(),
+        email: normalizedEmail,
         password: hashedPassword,
-        name: name || null,
+        name: normalizedName,
         address: placeholderAddress,
         status: "PENDING",
       },
@@ -68,8 +115,8 @@ export async function POST(request: Request) {
         status: user.status,
       },
     });
-  } catch (err: any) {
+  } catch (err) {
     console.error("[Email Register]", err);
-    return NextResponse.json({ error: err.message || "Registration failed" }, { status: 500 });
+    return NextResponse.json({ error: "Registration failed" }, { status: 500 });
   }
 }
