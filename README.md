@@ -171,6 +171,7 @@ CI workflow:
 - Runs on push/PR
 - Splits `__tests__/env.test.ts` into its own job (`env-validation-tests`) and runs remaining tests in `unit-tests`
 - Dependency audit workflow: `.github/workflows/dependency-audit.yml` (weekly + manual + package manifest changes on `main`; blocks only on high/critical)
+- Dependabot configuration: `.github/dependabot.yml` (weekly npm + GitHub Actions updates, grouped to reduce PR noise)
 - Branch protection setup guide: `docs/branch-protection.md`
 - Short PR description template: `docs/pr-description-short.md`
 - PR template: `.github/pull_request_template.md`
