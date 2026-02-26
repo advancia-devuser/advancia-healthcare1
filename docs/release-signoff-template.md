@@ -15,6 +15,8 @@ Use this template in PR descriptions or release notes for final approval.
 - [ ] `CI Tests / Unit/API tests (excluding env group)` is green
 - [ ] `Dependency Audit / npm audit (high/critical gate)` is green
 - [ ] `Docs Consistency / Validate docs/workflow sync` is green
+- [ ] If governance-strict branch protection is enabled, `Label Audit / Verify governance labels exist` is green
+- [ ] If strict metadata enforcement is enabled, `LABEL_AUDIT_FAIL_ON_DRIFT=true` is set and Label Audit has no drift failures
 - [ ] `docs/release-readiness-checklist.md` completed
 
 ## Security/dependency posture
