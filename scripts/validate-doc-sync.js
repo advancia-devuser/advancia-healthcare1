@@ -124,6 +124,20 @@ const mustContain = [
     ],
   },
   {
+    file: ".github/workflows/triage-auto-clear.yml",
+    values: [
+      "workflow_dispatch:",
+      "issue_number:",
+      "Invalid workflow_dispatch input issue_number",
+      "Triage auto-clear summary",
+      "needs-triage",
+      "risk:low",
+      "risk:medium",
+      "risk:high",
+      "release",
+    ],
+  },
+  {
     file: ".github/ISSUE_TEMPLATE/bug_report.yml",
     values: ["docs/label-glossary.md"],
   },

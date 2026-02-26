@@ -63,7 +63,7 @@ jobs:
 
             const hasAssignee = Array.isArray(issue.assignees) && issue.assignees.length > 0;
             const riskLabels = new Set(['risk:low', 'risk:medium', 'risk:high']);
-            const domainLabels = new Set(['bug', 'enhancement', 'security', 'dependencies', 'ci', 'docs']);
+            const domainLabels = new Set(['bug', 'enhancement', 'security', 'dependencies', 'ci', 'docs', 'release']);
 
             const hasRisk = labels.some((name) => riskLabels.has(name));
             const hasDomain = labels.some((name) => domainLabels.has(name));

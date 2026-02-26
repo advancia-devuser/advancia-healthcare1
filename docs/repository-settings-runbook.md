@@ -161,7 +161,7 @@ Feature-dependent variables (set only if feature is enabled):
 - Apply PR labels consistently using `docs/label-glossary.md`
 - Ensure `needs-triage` items receive owner + initial severity/domain classification within `1 business day`
 - Confirm reminder comments from `.github/workflows/triage-reminder.yml` are acted on and label is removed after triage
-- Ensure `.github/workflows/triage-auto-clear.yml` can remove `needs-triage` once owner + risk + domain labels are set
+- Ensure `.github/workflows/triage-auto-clear.yml` can remove `needs-triage` once owner + risk + domain labels are set (domain examples: `bug`, `enhancement`, `security`, `dependencies`, `ci`, `docs`, `release`)
 - For manual remediation, run `.github/workflows/triage-auto-clear.yml` with `workflow_dispatch` input `issue_number` to evaluate a specific issue on demand
 - Keep `.github/workflows/label-audit.yml` enabled for `pull_request` and `push` to `main`, and use monthly/manual runs for periodic governance audits
 
