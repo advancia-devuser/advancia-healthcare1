@@ -2,6 +2,29 @@ import { NextResponse } from "next/server";
 import { getAuthUser, requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+function normalizeOptionalNonEmptyString(value: unknown): string | null {
+  if (value === undefined) {
+    return null;
+  }
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized ? normalized : null;
+}
+
+function normalizeOptionalEmail(value: unknown): string | null {
+  const normalized = normalizeOptionalNonEmptyString(value);
+  if (!normalized) {
+    return null;
+  }
+  const lower = normalized.toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(lower)) {
+    return null;
+  }
+  return lower;
+}
+
 /**
  * GET /api/profile
  * Returns user profile with wallet info.
@@ -48,8 +71,9 @@ export async function GET(request: Request) {
       balances,
       subscription,
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    if (err instanceof Response) return err;
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
 
@@ -60,19 +84,61 @@ export async function GET(request: Request) {
  */
 export async function PATCH(request: Request) {
   try {
-    const user = await getAuthUser(request);
+    const user = await requireApprovedUser(request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { name, email, phone, avatarUrl } = body;
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
-    const updateData: Record<string, string> = {};
-    if (name !== undefined) updateData.name = name;
-    if (email !== undefined) updateData.email = email;
-    if (phone !== undefined) updateData.phone = phone;
-    if (avatarUrl !== undefined) updateData.avatarUrl = avatarUrl;
+    const { name, email, phone, avatarUrl } = body as {
+      name?: unknown;
+      email?: unknown;
+      phone?: unknown;
+      avatarUrl?: unknown;
+    };
+
+    const updateData: {
+      name?: string;
+      email?: string;
+      phone?: string;
+      avatarUrl?: string;
+    } = {};
+
+    if (name !== undefined) {
+      const normalizedName = normalizeOptionalNonEmptyString(name);
+      if (!normalizedName) {
+        return NextResponse.json({ error: "name must be a non-empty string" }, { status: 400 });
+      }
+      updateData.name = normalizedName;
+    }
+
+    if (email !== undefined) {
+      const normalizedEmail = normalizeOptionalEmail(email);
+      if (!normalizedEmail) {
+        return NextResponse.json({ error: "email must be a valid email address" }, { status: 400 });
+      }
+      updateData.email = normalizedEmail;
+    }
+
+    if (phone !== undefined) {
+      const normalizedPhone = normalizeOptionalNonEmptyString(phone);
+      if (!normalizedPhone) {
+        return NextResponse.json({ error: "phone must be a non-empty string" }, { status: 400 });
+      }
+      updateData.phone = normalizedPhone;
+    }
+
+    if (avatarUrl !== undefined) {
+      const normalizedAvatarUrl = normalizeOptionalNonEmptyString(avatarUrl);
+      if (!normalizedAvatarUrl) {
+        return NextResponse.json({ error: "avatarUrl must be a non-empty string" }, { status: 400 });
+      }
+      updateData.avatarUrl = normalizedAvatarUrl;
+    }
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
@@ -105,7 +171,8 @@ export async function PATCH(request: Request) {
         createdAt: updated.createdAt,
       },
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (err) {
+    if (err instanceof Response) return err;
+    return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
