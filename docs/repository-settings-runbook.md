@@ -181,6 +181,7 @@ Feature-dependent variables (set only if feature is enabled):
 - Symptom: workflow reports invalid `issue_number` or `hours_threshold`.
 - Likely cause: non-numeric/invalid manual input values.
 - Fix: set `issue_number` to a positive integer and `hours_threshold` to a positive number (or leave defaults).
+- Note: summary output includes skip counters for pull requests, non-open issues, and issues without `needs-triage` label.
 
 Manual run examples:
 

@@ -70,11 +70,26 @@ jobs:
             let staleEligible = 0;
             let alreadyCommentedCount = 0;
             let notEligibleCount = 0;
+            let skippedPullRequestCount = 0;
+            let skippedClosedCount = 0;
+            let skippedNonNeedsTriageCount = 0;
 
             for (const issue of issues) {
-              if (issue.pull_request) continue;
+              if (issue.pull_request) {
+                skippedPullRequestCount += 1;
+                continue;
+              }
+
+              if (issue.state !== 'open') {
+                skippedClosedCount += 1;
+                continue;
+              }
+
               const labels = (issue.labels || []).map((l) => (typeof l === 'string' ? l : l.name));
-              if (!labels.includes('needs-triage')) continue;
+              if (!labels.includes('needs-triage')) {
+                skippedNonNeedsTriageCount += 1;
+                continue;
+              }
 
               evaluated += 1;
 
@@ -117,6 +132,9 @@ jobs:
             summary.push(`Stale eligible issues: ${staleEligible}`);
             summary.push(`Already reminded (marker found): ${alreadyCommentedCount}`);
             summary.push(`Not yet stale: ${notEligibleCount}`);
+            summary.push(`Skipped pull requests: ${skippedPullRequestCount}`);
+            summary.push(`Skipped non-open issues: ${skippedClosedCount}`);
+            summary.push(`Skipped without needs-triage label: ${skippedNonNeedsTriageCount}`);
             summary.push(`Reminders posted: ${reminded}`);
             if (rawIssueNumber) {
               summary.push(`Manual issue scope: #${rawIssueNumber}`);
