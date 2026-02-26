@@ -97,6 +97,9 @@ const mustContain = [
     values: [
       "LABEL_AUDIT_FAIL_ON_DRIFT",
       "fail_on_drift",
+      "workflow_dispatch:",
+      "inputs:",
+      "github.event.inputs.fail_on_drift",
       "Verify governance labels exist",
       "security",
       "ci",
