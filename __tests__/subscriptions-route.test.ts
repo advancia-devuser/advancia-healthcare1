@@ -69,6 +69,19 @@ describe("Subscriptions API", () => {
     expect(prisma.subscription.create).not.toHaveBeenCalled();
   });
 
+  test("POST returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/subscriptions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.subscription.create).not.toHaveBeenCalled();
+  });
+
   test("POST rejects invalid chainId", async () => {
     const req = new Request("http://localhost:3000/api/subscriptions", {
       method: "POST",
@@ -129,6 +142,19 @@ describe("Subscriptions API", () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subscriptionId: "s1", action: "invalid" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.subscription.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/subscriptions", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
     });
 
     const res = await PATCH(req);
