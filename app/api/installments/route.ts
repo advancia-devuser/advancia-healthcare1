@@ -2,12 +2,74 @@ import { NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 
+type InstallmentFrequency = "WEEKLY" | "MONTHLY" | "CUSTOM";
+
+function parsePositiveInteger(value: string | null, fallback: number): number {
+  if (!value) {
+    return fallback;
+  }
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
+}
+
+function parsePositiveNumber(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number.parseFloat(String(value));
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return parsed;
+}
+
+function parseNonNegativeNumber(value: unknown): number | null {
+  const parsed = typeof value === "number" ? value : Number.parseFloat(String(value));
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    return null;
+  }
+  return parsed;
+}
+
+function normalizeFrequency(value: unknown): InstallmentFrequency | null {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toUpperCase();
+  if (normalized === "WEEKLY" || normalized === "MONTHLY" || normalized === "CUSTOM") {
+    return normalized;
+  }
+  return null;
+}
+
+function parseStartDate(value: unknown): Date | null {
+  if (value === undefined || value === null || value === "") {
+    return new Date();
+  }
+  const parsed = new Date(String(value));
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+  return parsed;
+}
+
+function normalizeOptionalString(value: unknown): string | null {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim();
+  return normalized || null;
+}
+
 /**
  * Utility: calculate due date based on frequency and index.
  */
 function calculateDueDate(
   start: Date,
-  frequency: string,
+  frequency: InstallmentFrequency,
   index: number
 ): Date {
   const d = new Date(start);
@@ -29,8 +91,8 @@ export async function GET(request: Request) {
   try {
     const user = await requireApprovedUser(request);
     const { searchParams } = new URL(request.url);
-    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-    const limit = Math.min(100, parseInt(searchParams.get("limit") || "20"));
+    const page = parsePositiveInteger(searchParams.get("page"), 1);
+    const limit = Math.min(100, parsePositiveInteger(searchParams.get("limit"), 20));
 
     const [installments, total] = await Promise.all([
       prisma.installment.findMany({
@@ -57,7 +119,10 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const user = await requireApprovedUser(request);
-    const body = await request.json();
+    const body: unknown = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
 
     const {
       totalAmount,
@@ -66,9 +131,26 @@ export async function POST(request: Request) {
       frequency,
       startDate,
       walletId,
-    } = body;
+    } = body as {
+      totalAmount?: unknown;
+      interestRate?: unknown;
+      installmentCount?: unknown;
+      frequency?: unknown;
+      startDate?: unknown;
+      walletId?: unknown;
+    };
 
-    if (!totalAmount || interestRate == null || !installmentCount || !frequency) {
+    const total = parsePositiveNumber(totalAmount);
+    const rate = parseNonNegativeNumber(interestRate);
+    const count = parsePositiveInteger(
+      installmentCount === undefined || installmentCount === null ? null : String(installmentCount),
+      0
+    );
+    const normalizedFrequency = normalizeFrequency(frequency);
+    const start = parseStartDate(startDate);
+    const normalizedWalletId = normalizeOptionalString(walletId);
+
+    if (!total || rate === null || count <= 0 || !normalizedFrequency || !start) {
       return NextResponse.json(
         {
           error:
@@ -78,25 +160,21 @@ export async function POST(request: Request) {
       );
     }
 
-    const total = parseFloat(totalAmount);
-    const rate = parseFloat(interestRate);
-    const count = parseInt(installmentCount);
     const totalPayable = total + (total * rate) / 100;
     const installmentAmount = totalPayable / count;
-    const start = startDate ? new Date(startDate) : new Date();
 
     const installment = await prisma.$transaction(async (tx) => {
       const inst = await tx.installment.create({
         data: {
           userId: user.id,
-          walletId: walletId || null,
+          walletId: normalizedWalletId,
           totalAmount: total,
           interestRate: rate,
           totalPayable,
           installmentCount: count,
-          frequency: frequency as any,
+          frequency: normalizedFrequency,
           startDate: start,
-          nextDueDate: calculateDueDate(start, frequency, 0),
+          nextDueDate: calculateDueDate(start, normalizedFrequency, 0),
         },
       });
 
@@ -104,7 +182,7 @@ export async function POST(request: Request) {
         await tx.installmentPayment.create({
           data: {
             installmentId: inst.id,
-            dueDate: calculateDueDate(start, frequency, i),
+            dueDate: calculateDueDate(start, normalizedFrequency, i),
             amountDue: installmentAmount,
           },
         });
@@ -123,7 +201,7 @@ export async function POST(request: Request) {
           interestRate: rate,
           totalPayable,
           installmentCount: count,
-          frequency,
+          frequency: normalizedFrequency,
         }),
       },
     });
