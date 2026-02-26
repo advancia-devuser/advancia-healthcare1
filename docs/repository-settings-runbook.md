@@ -94,6 +94,7 @@ Feature-dependent variables (set only if feature is enabled):
 
 - CI tests: `.github/workflows/ci-tests.yml`
 - Dependency audit gate: `.github/workflows/dependency-audit.yml`
+- Needs-triage reminder: `.github/workflows/triage-reminder.yml`
 - Docs/workflow consistency gate: `.github/workflows/docs-consistency.yml`
 - Post-deploy verification: `.github/workflows/post-deploy-verify.yml`
 - Dependabot updates: `.github/dependabot.yml`
@@ -114,6 +115,7 @@ Feature-dependent variables (set only if feature is enabled):
 - Revisit unresolved moderate advisories when upstream fixable versions are released
 - Apply PR labels consistently using `docs/label-glossary.md`
 - Ensure `needs-triage` items receive owner + initial severity/domain classification within `1 business day`
+- Confirm reminder comments from `.github/workflows/triage-reminder.yml` are acted on and label is removed after triage
 
 ## 6) Troubleshooting (common failures)
 

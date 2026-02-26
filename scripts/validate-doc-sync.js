@@ -6,6 +6,7 @@ const root = process.cwd();
 const mustExist = [
   ".github/workflows/ci-tests.yml",
   ".github/workflows/dependency-audit.yml",
+  ".github/workflows/triage-reminder.yml",
   ".github/workflows/post-deploy-verify.yml",
   ".github/dependabot.yml",
   ".github/ISSUE_TEMPLATE/bug_report.yml",
@@ -29,6 +30,7 @@ const mustContain = [
       "docs/release-signoff-template.md",
       "docs/label-glossary.md",
       ".github/workflows/dependency-audit.yml",
+      ".github/workflows/triage-reminder.yml",
       ".github/dependabot.yml",
     ],
   },
@@ -45,6 +47,7 @@ const mustContain = [
       "docs/label-glossary.md",
       ".github/workflows/ci-tests.yml",
       ".github/workflows/dependency-audit.yml",
+      ".github/workflows/triage-reminder.yml",
       ".github/workflows/post-deploy-verify.yml",
       ".github/dependabot.yml",
     ],
