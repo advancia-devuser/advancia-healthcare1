@@ -35,6 +35,7 @@ describe("Gift Cards API", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     (requireApprovedUser as unknown as jest.Mock).mockResolvedValue(approvedUser);
+    (debitWallet as unknown as jest.Mock).mockResolvedValue(undefined);
   });
 
   test("GET rejects invalid status filter", async () => {
@@ -57,11 +58,71 @@ describe("Gift Cards API", () => {
     );
   });
 
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/gift-cards");
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.giftCard.findMany).not.toHaveBeenCalled();
+  });
+
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.giftCard.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/gift-cards");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("POST rejects invalid initial value", async () => {
     const req = new Request("http://localhost:3000/api/gift-cards", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ merchantName: "Amazon", initialValue: "10.5" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects missing required fields", async () => {
+    const req = new Request("http://localhost:3000/api/gift-cards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ merchantName: "Amazon" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects zero initial value", async () => {
+    const req = new Request("http://localhost:3000/api/gift-cards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ merchantName: "Amazon", initialValue: "0" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects invalid expiresAt", async () => {
+    const req = new Request("http://localhost:3000/api/gift-cards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ merchantName: "Amazon", initialValue: "100", expiresAt: "not-a-date" }),
     });
 
     const res = await POST(req);
@@ -148,11 +209,55 @@ describe("Gift Cards API", () => {
     expect(res.status).toBe(400);
   });
 
+  test("POST passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Forbidden" }, { status: 403 })
+    );
+
+    const req = new Request("http://localhost:3000/api/gift-cards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ merchantName: "Amazon", initialValue: "100" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(403);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST returns 500 on unexpected errors", async () => {
+    (prisma.giftCard.create as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/gift-cards", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ merchantName: "Amazon", initialValue: "100" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("PATCH rejects zero redeem amount", async () => {
     const req = new Request("http://localhost:3000/api/gift-cards", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cardId: "gc1", redeemAmount: "0" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.giftCard.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects missing cardId", async () => {
+    const req = new Request("http://localhost:3000/api/gift-cards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ redeemAmount: "5" }),
     });
 
     const res = await PATCH(req);
@@ -235,5 +340,36 @@ describe("Gift Cards API", () => {
         data: expect.objectContaining({ currentValue: "0", status: "REDEEMED" }),
       })
     );
+  });
+
+  test("PATCH passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/gift-cards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: "gc1", redeemAmount: "5" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.giftCard.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 500 on unexpected errors", async () => {
+    (prisma.giftCard.findFirst as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/gift-cards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: "gc1", redeemAmount: "5" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(500);
   });
 });
