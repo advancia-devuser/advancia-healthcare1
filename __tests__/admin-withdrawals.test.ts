@@ -238,6 +238,44 @@ describe("Admin Withdrawals API", () => {
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
   });
 
+  test("PATCH trims withdrawalId before lookup", async () => {
+    (txMock.withdrawal.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "w-trim",
+      userId: "u1",
+      status: "PENDING",
+      amount: "1",
+      asset: "ETH",
+      chainId: 1,
+      toAddress: "0xabc",
+      user: { email: "u1@test.com", phone: "+12345678901", address: "0x1" },
+    });
+
+    (debitWallet as unknown as jest.Mock).mockResolvedValue({ transactionId: "tx-trim" });
+
+    (txMock.withdrawal.update as unknown as jest.Mock).mockResolvedValue({
+      id: "w-trim",
+      userId: "u1",
+      amount: "1",
+      asset: "ETH",
+      user: { email: "u1@test.com", phone: "+12345678901" },
+    });
+
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/withdrawals", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ withdrawalId: "  w-trim  ", action: "APPROVE" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(txMock.withdrawal.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "w-trim" } })
+    );
+  });
+
   test("PATCH rejects pending withdrawal and writes audit log", async () => {
     (txMock.withdrawal.findUnique as unknown as jest.Mock).mockResolvedValue({
       id: "w2",
@@ -272,6 +310,42 @@ describe("Admin Withdrawals API", () => {
     expect(debitWallet).not.toHaveBeenCalled();
     expect(sendWithdrawalEmail).toHaveBeenCalledWith("u1@test.com", "REJECTED", "2.0", "ETH");
     expect(sendWithdrawalSms).toHaveBeenCalledWith("+12345678901", "REJECTED", "2.0", "ETH");
+    expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("PATCH skips notifications when user contact fields are missing", async () => {
+    (txMock.withdrawal.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "w3",
+      userId: "u1",
+      status: "PENDING",
+      amount: "3.0",
+      asset: "ETH",
+      chainId: 1,
+      toAddress: "0xaaa",
+      user: { email: null, phone: null, address: "0x1" },
+    });
+
+    (txMock.withdrawal.update as unknown as jest.Mock).mockResolvedValue({
+      id: "w3",
+      userId: "u1",
+      amount: "3.0",
+      asset: "ETH",
+      user: { email: null, phone: null },
+    });
+
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/withdrawals", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ withdrawalId: "w3", action: "REJECT" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(sendWithdrawalEmail).not.toHaveBeenCalled();
+    expect(sendWithdrawalSms).not.toHaveBeenCalled();
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
   });
 
