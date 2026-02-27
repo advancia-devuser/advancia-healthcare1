@@ -84,6 +84,24 @@ describe("Admin Withdrawals API", () => {
     );
   });
 
+  test("GET normalizes status and caps limit at 100", async () => {
+    (prisma.withdrawal.findMany as unknown as jest.Mock).mockResolvedValue([]);
+    (prisma.withdrawal.count as unknown as jest.Mock).mockResolvedValue(0);
+
+    const req = new Request("http://localhost:3000/api/admin/withdrawals?status=  approved  &page=2&limit=999");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.withdrawal.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { status: "APPROVED" },
+        skip: 100,
+        take: 100,
+      })
+    );
+    expect(prisma.withdrawal.count).toHaveBeenCalledWith({ where: { status: "APPROVED" } });
+  });
+
   test("GET returns 500 when database query fails", async () => {
     (prisma.withdrawal.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
 
@@ -126,6 +144,19 @@ describe("Admin Withdrawals API", () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: "{",
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects missing withdrawalId", async () => {
+    const req = new Request("http://localhost:3000/api/admin/withdrawals", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "APPROVE" }),
     });
 
     const res = await PATCH(req);
