@@ -13,10 +13,10 @@
 ## Validation
 
 - Route-level focused tests were run per hardening increment.
-- Latest full-suite status after follow-up branch-coverage expansions: **486 passed, 0 failed**.
+- Latest full-suite status after follow-up branch-coverage expansions: **502 passed, 0 failed**.
 - Repo-wide check for raw `await request.json();` in `app/api/**/route.ts`: **no matches**.
 
 ## Commit window
 - Hardening range: `fc4b12c` → `93f95f1`
-- Follow-up branch-coverage range: `93f95f1` → `e8fa17f`
+- Follow-up branch-coverage range: `93f95f1` → `32b99f1`
 - Release notes doc: `RELEASE_NOTES_HARDENING.md`
