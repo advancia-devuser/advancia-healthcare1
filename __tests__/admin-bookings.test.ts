@@ -36,11 +36,47 @@ describe("Admin Bookings API", () => {
     expect(res.status).toBe(403);
   });
 
+  test("GET returns 500 when query fails", async () => {
+    (prisma.booking.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const res = await GET();
+
+    expect(res.status).toBe(500);
+  });
+
   test("PATCH rejects invalid action", async () => {
     const req = new Request("http://localhost:3000/api/admin/bookings", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ bookingId: "b1", action: "INVALID" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.booking.findUnique).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 403 when not admin", async () => {
+    (isAdminRequest as unknown as jest.Mock).mockResolvedValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "b1", action: "CONFIRM" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(403);
+    expect(prisma.booking.findUnique).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects missing bookingId", async () => {
+    const req = new Request("http://localhost:3000/api/admin/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "CONFIRM" }),
     });
 
     const res = await PATCH(req);
@@ -111,5 +147,28 @@ describe("Admin Bookings API", () => {
     );
     expect(prisma.notification.create).toHaveBeenCalledTimes(1);
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("PATCH returns 500 on unexpected errors", async () => {
+    (prisma.booking.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "b1",
+      userId: "u1",
+      chamberName: "Heart Clinic",
+      date: "2026-03-01",
+      timeSlot: "10:00",
+    });
+    (prisma.booking.update as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/admin/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "b1", action: "CONFIRM" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(500);
+    expect(prisma.notification.create).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
   });
 });
