@@ -55,6 +55,35 @@ describe("Health Reminders API", () => {
     );
   });
 
+  test("GET rejects invalid type filter", async () => {
+    const req = new Request("http://localhost:3000/api/health/reminders?type=UnknownType");
+    const res = await GET(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.healthReminder.findMany).not.toHaveBeenCalled();
+  });
+
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/health/reminders");
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.healthReminder.findMany).not.toHaveBeenCalled();
+  });
+
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.healthReminder.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/health/reminders");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("POST rejects past remindAt", async () => {
     const past = new Date(Date.now() - 60_000).toISOString();
     const req = new Request("http://localhost:3000/api/health/reminders", {
@@ -121,6 +150,45 @@ describe("Health Reminders API", () => {
 
     expect(res.status).toBe(400);
     expect(prisma.healthReminder.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects missing reminderId", async () => {
+    const req = new Request("http://localhost:3000/api/health/reminders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status: "COMPLETED" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.healthReminder.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects invalid status value", async () => {
+    const req = new Request("http://localhost:3000/api/health/reminders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reminderId: "r1", status: "INVALID" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.healthReminder.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects invalid remindAt value", async () => {
+    const req = new Request("http://localhost:3000/api/health/reminders", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reminderId: "r1", remindAt: "not-a-date" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.healthReminder.findFirst).not.toHaveBeenCalled();
   });
 
   test("PATCH returns 400 for malformed JSON body", async () => {
@@ -200,5 +268,26 @@ describe("Health Reminders API", () => {
 
     expect(res.status).toBe(200);
     expect(prisma.healthReminder.delete).toHaveBeenCalledWith({ where: { id: "r1" } });
+  });
+
+  test("DELETE passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Rate limited" }, { status: 429 })
+    );
+
+    const req = new Request("http://localhost:3000/api/health/reminders?reminderId=r1");
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(429);
+    expect(prisma.healthReminder.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("DELETE returns 500 on unexpected errors", async () => {
+    (prisma.healthReminder.findFirst as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/health/reminders?reminderId=r1");
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(500);
   });
 });
