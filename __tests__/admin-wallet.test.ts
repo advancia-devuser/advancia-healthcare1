@@ -57,6 +57,19 @@ describe("Admin Wallet API", () => {
     expect(prisma.adminWallet.upsert).not.toHaveBeenCalled();
   });
 
+  test("POST returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.adminWallet.upsert).not.toHaveBeenCalled();
+  });
+
   test("POST credits wallet and writes CREDIT transaction", async () => {
     (prisma.adminWallet.findFirst as unknown as jest.Mock).mockResolvedValue({
       id: "w1",
@@ -100,6 +113,19 @@ describe("Admin Wallet API", () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ asset: "ETH", amount: "0" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.adminWallet.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
     });
 
     const res = await PATCH(req);
