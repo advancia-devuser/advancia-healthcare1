@@ -62,6 +62,27 @@ describe("Admin Payment Requests API", () => {
     );
   });
 
+  test("GET normalizes status and caps limit at 100", async () => {
+    (prisma.paymentRequest.findMany as unknown as jest.Mock).mockResolvedValue([]);
+    (prisma.paymentRequest.count as unknown as jest.Mock).mockResolvedValue(150);
+    (prisma.paymentRequest.groupBy as unknown as jest.Mock).mockResolvedValue([
+      { status: "PENDING", _count: { _all: 150 } },
+    ]);
+
+    const req = new Request("http://localhost:3000/api/admin/payment-requests?status= pending &page=2&limit=999");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.paymentRequest.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { status: "PENDING" },
+        skip: 100,
+        take: 100,
+      })
+    );
+    expect(prisma.paymentRequest.count).toHaveBeenCalledWith({ where: { status: "PENDING" } });
+  });
+
   test("GET returns 500 when query fails", async () => {
     (prisma.paymentRequest.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
 
@@ -104,6 +125,19 @@ describe("Admin Payment Requests API", () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: "{",
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.paymentRequest.findUnique).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects missing requestId", async () => {
+    const req = new Request("http://localhost:3000/api/admin/payment-requests", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "CANCEL" }),
     });
 
     const res = await PATCH(req);
