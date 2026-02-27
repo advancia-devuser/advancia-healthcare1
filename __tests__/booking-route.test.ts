@@ -176,6 +176,19 @@ describe("Booking API", () => {
     expect(prisma.booking.findFirst).not.toHaveBeenCalled();
   });
 
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/booking", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.booking.findFirst).not.toHaveBeenCalled();
+  });
+
   test("PATCH returns 404 for missing booking", async () => {
     (prisma.booking.findFirst as unknown as jest.Mock).mockResolvedValue(null);
 
