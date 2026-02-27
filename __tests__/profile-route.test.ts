@@ -135,6 +135,19 @@ describe("Profile API", () => {
     expect(json.wallet.balance).toBe("0");
   });
 
+  test("GET queries active subscription with descending createdAt", async () => {
+    const req = new Request("http://localhost:3000/api/profile");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.subscription.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "u1", status: "ACTIVE" },
+        orderBy: { createdAt: "desc" },
+      })
+    );
+  });
+
   test("PATCH returns 400 for malformed JSON body", async () => {
     const req = new Request("http://localhost:3000/api/profile", {
       method: "PATCH",
@@ -192,6 +205,19 @@ describe("Profile API", () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ avatarUrl: "   " }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 400 for non-string phone value", async () => {
+    const req = new Request("http://localhost:3000/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: 12345 }),
     });
 
     const res = await PATCH(req);
