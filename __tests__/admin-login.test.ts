@@ -91,6 +91,36 @@ describe("Admin Login API", () => {
     expect(res.status).toBe(400);
   });
 
+  test("POST returns 429 when admin lock is active", async () => {
+    (getAdminLockRemainingMs as unknown as jest.Mock).mockResolvedValue(5000);
+
+    const req = new Request("http://localhost:3000/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "pass" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(429);
+    expect(checkRateLimitPersistent).not.toHaveBeenCalled();
+  });
+
+  test("POST returns 429 when base rate limit is exceeded", async () => {
+    (checkRateLimitPersistent as unknown as jest.Mock).mockResolvedValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "pass" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(429);
+    expect(registerAdminFailure).not.toHaveBeenCalled();
+  });
+
   test("POST returns 401 when password is missing", async () => {
     const req = new Request("http://localhost:3000/api/admin/login", {
       method: "POST",
@@ -102,6 +132,22 @@ describe("Admin Login API", () => {
 
     expect(res.status).toBe(401);
     expect(registerAdminFailure).toHaveBeenCalledTimes(1);
+  });
+
+  test("POST returns 401 when password is incorrect", async () => {
+    (compare as unknown as jest.Mock).mockResolvedValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "wrong" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(401);
+    expect(registerAdminFailure).toHaveBeenCalledTimes(1);
+    expect(signAdminToken).not.toHaveBeenCalled();
   });
 
   test("POST requires 2FA code when enabled", async () => {
@@ -174,6 +220,24 @@ describe("Admin Login API", () => {
     expect(res.status).toBe(200);
     expect(decrypt).toHaveBeenCalledWith("encrypted");
     expect(verifyTotpCode).toHaveBeenCalledWith("secret", "123456");
+  });
+
+  test("POST returns 401 when numeric 2FA code is incorrect", async () => {
+    (prisma.adminConfig.findUnique as unknown as jest.Mock).mockResolvedValue({ value: "encrypted" });
+    (decrypt as unknown as jest.Mock).mockReturnValue("secret");
+    (verifyTotpCode as unknown as jest.Mock).mockReturnValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "pass", totpCode: "123456" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(401);
+    expect(registerAdminFailure).toHaveBeenCalledTimes(1);
+    expect(signAdminToken).not.toHaveBeenCalled();
   });
 
   test("DELETE clears admin_session cookie", async () => {
