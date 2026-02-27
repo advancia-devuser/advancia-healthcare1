@@ -52,6 +52,20 @@ describe("Bank Accounts API", () => {
     );
   });
 
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/bank-accounts");
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe("Unauthorized");
+    expect(prisma.bankAccount.findMany).not.toHaveBeenCalled();
+  });
+
   test("POST rejects invalid accountLast4", async () => {
     const req = new Request("http://localhost:3000/api/bank-accounts", {
       method: "POST",
@@ -173,6 +187,25 @@ describe("Bank Accounts API", () => {
     );
   });
 
+  test("POST passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Rate limited" }, { status: 429 })
+    );
+
+    const req = new Request("http://localhost:3000/api/bank-accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bankName: "Acme", accountLast4: "5678" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.error).toBe("Rate limited");
+    expect(prisma.bankAccount.create).not.toHaveBeenCalled();
+  });
+
   test("DELETE rejects missing accountId", async () => {
     const req = new Request("http://localhost:3000/api/bank-accounts", {
       method: "DELETE",
@@ -232,5 +265,24 @@ describe("Bank Accounts API", () => {
       expect.objectContaining({ where: { id: "a1" }, data: { status: "REMOVED" } })
     );
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("DELETE passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Too many requests" }, { status: 429 })
+    );
+
+    const req = new Request("http://localhost:3000/api/bank-accounts", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accountId: "a1" }),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.error).toBe("Too many requests");
+    expect(prisma.bankAccount.findFirst).not.toHaveBeenCalled();
   });
 });
