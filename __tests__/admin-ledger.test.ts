@@ -29,6 +29,21 @@ describe("Admin Ledger API", () => {
     (isAdminRequest as unknown as jest.Mock).mockResolvedValue(true);
   });
 
+  test("POST returns 403 when not admin", async () => {
+    (isAdminRequest as unknown as jest.Mock).mockResolvedValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/ledger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "u1", amount: "10" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(403);
+    expect(creditWallet).not.toHaveBeenCalled();
+  });
+
   test("POST rejects invalid amount", async () => {
     const req = new Request("http://localhost:3000/api/admin/ledger", {
       method: "POST",
@@ -68,6 +83,32 @@ describe("Admin Ledger API", () => {
     expect(creditWallet).not.toHaveBeenCalled();
   });
 
+  test("POST rejects request without userId or address", async () => {
+    const req = new Request("http://localhost:3000/api/admin/ledger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: "10" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(creditWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects invalid chainId", async () => {
+    const req = new Request("http://localhost:3000/api/admin/ledger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "u1", amount: "10", chainId: 0 }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(creditWallet).not.toHaveBeenCalled();
+  });
+
   test("POST returns 404 when user is missing", async () => {
     (prisma.user.findUnique as unknown as jest.Mock).mockResolvedValue(null);
 
@@ -80,6 +121,45 @@ describe("Admin Ledger API", () => {
     const res = await POST(req);
 
     expect(res.status).toBe(404);
+  });
+
+  test("POST rejects users that are not approved", async () => {
+    (prisma.user.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "u1",
+      status: "PENDING",
+      address: "0xabc",
+    });
+
+    const req = new Request("http://localhost:3000/api/admin/ledger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "u1", amount: "10" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(creditWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST maps duplicate txHash to 409", async () => {
+    (prisma.user.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "u1",
+      status: "APPROVED",
+      address: "0xabc",
+    });
+
+    (creditWallet as unknown as jest.Mock).mockRejectedValue(new Error("Duplicate txHash: admin-credit:key"));
+
+    const req = new Request("http://localhost:3000/api/admin/ledger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "u1", amount: "10", idempotencyKey: "key" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(409);
   });
 
   test("POST credits approved user and writes audit log", async () => {
@@ -128,6 +208,34 @@ describe("Admin Ledger API", () => {
     const res = await PATCH(req);
 
     expect(res.status).toBe(400);
+  });
+
+  test("PATCH returns 403 when not admin", async () => {
+    (isAdminRequest as unknown as jest.Mock).mockResolvedValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/ledger", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "u1", amount: "10" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(403);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects request without userId or address", async () => {
+    const req = new Request("http://localhost:3000/api/admin/ledger", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: "10" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(debitWallet).not.toHaveBeenCalled();
   });
 
   test("PATCH returns 400 for malformed JSON body", async () => {
