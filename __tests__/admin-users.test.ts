@@ -207,6 +207,87 @@ describe("Admin Users API", () => {
     expect(sendAccountStatusSms).toHaveBeenCalledWith("+12345678901", "RESTORED");
   });
 
+  test("PATCH trims userId before update", async () => {
+    (prisma.user.update as unknown as jest.Mock).mockResolvedValue({
+      id: "u-trim",
+      email: null,
+      phone: null,
+      status: "APPROVED",
+    });
+    (prisma.notification.create as unknown as jest.Mock).mockResolvedValue({});
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "  u-trim  ", action: "APPROVE" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "u-trim" } })
+    );
+  });
+
+  test("PATCH maps REJECT action to rejected status notifications", async () => {
+    (prisma.user.update as unknown as jest.Mock).mockResolvedValue({
+      id: "u2",
+      email: "u2@test.com",
+      phone: "+12345678901",
+      status: "REJECTED",
+    });
+    (prisma.notification.create as unknown as jest.Mock).mockResolvedValue({});
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "u2", action: "REJECT" }),
+    });
+
+    const res = await PATCH(req);
+    expect(res.status).toBe(200);
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({ data: { status: "REJECTED" } })
+    );
+    expect(prisma.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          title: "Account Rejected",
+        }),
+      })
+    );
+    expect(sendAccountStatusEmail).toHaveBeenCalledWith("u2@test.com", "REJECTED");
+    expect(sendAccountStatusSms).toHaveBeenCalledWith("+12345678901", "REJECTED");
+  });
+
+  test("PATCH skips email and sms when user has no contact fields", async () => {
+    (prisma.user.update as unknown as jest.Mock).mockResolvedValue({
+      id: "u3",
+      email: null,
+      phone: null,
+      status: "SUSPENDED",
+    });
+    (prisma.notification.create as unknown as jest.Mock).mockResolvedValue({});
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "u3", action: "SUSPEND" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.notification.create).toHaveBeenCalledTimes(1);
+    expect(sendAccountStatusEmail).not.toHaveBeenCalled();
+    expect(sendAccountStatusSms).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
   test("PATCH returns 500 for unexpected errors", async () => {
     (prisma.user.update as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
 
