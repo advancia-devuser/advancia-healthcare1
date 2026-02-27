@@ -75,6 +75,20 @@ describe("Profile API", () => {
     expect(prisma.wallet.findUnique).not.toHaveBeenCalled();
   });
 
+  test("GET passes through thrown Response errors", async () => {
+    (getAuthUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Auth failed" }, { status: 403 })
+    );
+
+    const req = new Request("http://localhost:3000/api/profile");
+    const res = await GET(req);
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("Auth failed");
+    expect(prisma.wallet.findUnique).not.toHaveBeenCalled();
+  });
+
   test("GET returns profile payload for authenticated user", async () => {
     const req = new Request("http://localhost:3000/api/profile");
     const res = await GET(req);
@@ -292,6 +306,25 @@ describe("Profile API", () => {
     const res = await PATCH(req);
 
     expect(res.status).toBe(500);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Denied" }, { status: 429 })
+    );
+
+    const req = new Request("http://localhost:3000/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Alice" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.error).toBe("Denied");
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
