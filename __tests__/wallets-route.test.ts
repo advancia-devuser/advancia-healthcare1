@@ -97,6 +97,15 @@ describe("Wallets API", () => {
     expect(prisma.wallet.findUnique).not.toHaveBeenCalled();
   });
 
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.wallet.findUnique as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/wallets");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("POST returns 400 for malformed JSON", async () => {
     const req = new Request("http://localhost:3000/api/wallets", {
       method: "POST",
@@ -107,6 +116,23 @@ describe("Wallets API", () => {
     const res = await POST(req);
 
     expect(res.status).toBe(400);
+    expect(prisma.wallet.create).not.toHaveBeenCalled();
+  });
+
+  test("POST passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Too many requests" }, { status: 429 })
+    );
+
+    const req = new Request("http://localhost:3000/api/wallets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ smartAccountAddress: "0xwallet", chainId: 84532 }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(429);
     expect(prisma.wallet.create).not.toHaveBeenCalled();
   });
 
