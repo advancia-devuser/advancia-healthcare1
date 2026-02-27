@@ -70,6 +70,44 @@ describe("Health Transactions API", () => {
     );
   });
 
+  test("GET normalizes status and caps limit at 100", async () => {
+    (prisma.healthTransaction.findMany as unknown as jest.Mock).mockResolvedValue([]);
+    (prisma.healthTransaction.count as unknown as jest.Mock).mockResolvedValue(0);
+
+    const req = new Request("http://localhost:3000/api/health/transactions?status= completed &page=2&limit=999");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.healthTransaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "u1", status: "COMPLETED" },
+        skip: 100,
+        take: 100,
+      })
+    );
+  });
+
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/health/transactions");
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.healthTransaction.findMany).not.toHaveBeenCalled();
+  });
+
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.healthTransaction.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/health/transactions");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("POST rejects invalid amount format", async () => {
     const req = new Request("http://localhost:3000/api/health/transactions", {
       method: "POST",
@@ -126,6 +164,23 @@ describe("Health Transactions API", () => {
     expect(prisma.healthTransaction.create).not.toHaveBeenCalled();
   });
 
+  test("POST passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Rate limited" }, { status: 429 })
+    );
+
+    const req = new Request("http://localhost:3000/api/health/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: "100", description: "Bill" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(429);
+    expect(prisma.healthTransaction.create).not.toHaveBeenCalled();
+  });
+
   test("POST maps insufficient balance errors to 400 and marks failed", async () => {
     (prisma.wallet.findUnique as unknown as jest.Mock).mockResolvedValue({
       userId: "u1",
@@ -147,6 +202,30 @@ describe("Health Transactions API", () => {
     expect(res.status).toBe(400);
     expect(prisma.healthTransaction.update).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "ht1" }, data: { status: "FAILED" } })
+    );
+  });
+
+  test("POST returns 500 on unexpected debit errors", async () => {
+    (prisma.wallet.findUnique as unknown as jest.Mock).mockResolvedValue({
+      userId: "u1",
+      chainId: 421614,
+      smartAccountAddress: "0xwallet",
+    });
+    (prisma.healthTransaction.create as unknown as jest.Mock).mockResolvedValue({ id: "ht2" });
+    (debitWallet as unknown as jest.Mock).mockRejectedValue(new Error("ledger failure"));
+    (prisma.healthTransaction.update as unknown as jest.Mock).mockResolvedValue({ id: "ht2", status: "FAILED" });
+
+    const req = new Request("http://localhost:3000/api/health/transactions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: "100", description: "Bill" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+    expect(prisma.healthTransaction.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "ht2" }, data: { status: "FAILED" } })
     );
   });
 
