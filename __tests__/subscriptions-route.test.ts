@@ -56,6 +56,27 @@ describe("Subscriptions API", () => {
     );
   });
 
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Denied" }, { status: 403 })
+    );
+
+    const req = new Request("http://localhost:3000/api/subscriptions");
+    const res = await GET(req);
+
+    expect(res.status).toBe(403);
+    expect(prisma.subscription.findMany).not.toHaveBeenCalled();
+  });
+
+  test("GET returns 500 for unexpected errors", async () => {
+    (prisma.subscription.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/subscriptions");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("POST rejects missing tier", async () => {
     const req = new Request("http://localhost:3000/api/subscriptions", {
       method: "POST",
@@ -123,6 +144,31 @@ describe("Subscriptions API", () => {
     expect(prisma.subscription.create).toHaveBeenCalledTimes(1);
   });
 
+  test("POST creates free-tier subscription without wallet debit", async () => {
+    (prisma.subscription.create as unknown as jest.Mock).mockResolvedValue({
+      id: "s-free",
+      userId: "u1",
+      tier: "FREE",
+      status: "ACTIVE",
+    });
+
+    const req = new Request("http://localhost:3000/api/subscriptions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tier: "FREE" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(201);
+    expect(debitWallet).not.toHaveBeenCalled();
+    expect(prisma.subscription.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ tier: "FREE", nextBillingDate: null }),
+      })
+    );
+  });
+
   test("POST maps insufficient balance errors to 400", async () => {
     (debitWallet as unknown as jest.Mock).mockRejectedValue(new Error("Insufficient balance"));
 
@@ -135,6 +181,20 @@ describe("Subscriptions API", () => {
     const res = await POST(req);
 
     expect(res.status).toBe(400);
+  });
+
+  test("POST returns 500 for unexpected errors", async () => {
+    (prisma.subscription.create as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/subscriptions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tier: "FREE" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
   });
 
   test("PATCH rejects invalid action", async () => {
@@ -205,5 +265,36 @@ describe("Subscriptions API", () => {
         data: expect.objectContaining({ status: "PAUSED" }),
       })
     );
+  });
+
+  test("PATCH passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/subscriptions", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscriptionId: "s1", action: "pause" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.subscription.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 500 for unexpected errors", async () => {
+    (prisma.subscription.findFirst as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/subscriptions", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscriptionId: "s1", action: "pause" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(500);
   });
 });
