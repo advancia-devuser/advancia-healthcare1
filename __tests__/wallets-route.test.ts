@@ -64,6 +64,39 @@ describe("Wallets API", () => {
     expect(json.balances).toHaveLength(1);
   });
 
+  test("GET defaults wallet balance to 0 when ETH balance is missing", async () => {
+    (prisma.wallet.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "w1",
+      userId: "u1",
+      smartAccountAddress: "0xwallet",
+      chainId: 84532,
+    });
+    (prisma.walletBalance.findMany as unknown as jest.Mock).mockResolvedValue([
+      { asset: "USDC", balance: "11", updatedAt: new Date("2026-01-01T00:00:00.000Z") },
+    ]);
+
+    const req = new Request("http://localhost:3000/api/wallets");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.wallet.balance).toBe("0");
+  });
+
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/wallets");
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    const json = await res.json();
+    expect(json.error).toBe("Unauthorized");
+    expect(prisma.wallet.findUnique).not.toHaveBeenCalled();
+  });
+
   test("POST returns 400 for malformed JSON", async () => {
     const req = new Request("http://localhost:3000/api/wallets", {
       method: "POST",
@@ -132,5 +165,19 @@ describe("Wallets API", () => {
       })
     );
     expect(prisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  test("POST returns 500 on unexpected errors", async () => {
+    (prisma.wallet.create as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/wallets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ smartAccountAddress: "0xwallet", chainId: 84532 }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
   });
 });
