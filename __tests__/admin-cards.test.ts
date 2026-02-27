@@ -56,11 +56,47 @@ describe("Admin Cards API", () => {
     );
   });
 
+  test("GET returns 500 when query fails", async () => {
+    (prisma.cardRequest.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/admin/cards");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("PATCH rejects invalid action", async () => {
     const req = new Request("http://localhost:3000/api/admin/cards", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ cardId: "c1", action: "INVALID" }),
+    });
+
+    const res = await PATCH(req);
+    expect(res.status).toBe(400);
+    expect(prisma.cardRequest.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 403 when request is not admin", async () => {
+    (isAdminRequest as unknown as jest.Mock).mockResolvedValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/cards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: "c1", action: "APPROVE", last4: "1234" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(403);
+    expect(prisma.cardRequest.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects missing cardId", async () => {
+    const req = new Request("http://localhost:3000/api/admin/cards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "APPROVE", last4: "1234" }),
     });
 
     const res = await PATCH(req);
@@ -153,5 +189,19 @@ describe("Admin Cards API", () => {
 
     const body = await res.json();
     expect(body.error).toBe("Card request not found");
+  });
+
+  test("PATCH returns 500 for unexpected errors", async () => {
+    (prisma.cardRequest.update as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/admin/cards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: "card-1", action: "REJECT" }),
+    });
+
+    const res = await PATCH(req);
+    expect(res.status).toBe(500);
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
   });
 });
