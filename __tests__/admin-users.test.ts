@@ -39,6 +39,16 @@ describe("Admin Users API", () => {
     (isAdminRequest as unknown as jest.Mock).mockResolvedValue(true);
   });
 
+  test("GET returns 403 when request is not admin", async () => {
+    (isAdminRequest as unknown as jest.Mock).mockResolvedValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/users");
+    const res = await GET(req);
+
+    expect(res.status).toBe(403);
+    expect(prisma.user.findMany).not.toHaveBeenCalled();
+  });
+
   test("GET rejects invalid status", async () => {
     const req = new Request("http://localhost:3000/api/admin/users?status=INVALID");
     const res = await GET(req);
@@ -63,6 +73,38 @@ describe("Admin Users API", () => {
     );
   });
 
+  test("GET normalizes status/search and caps limit at 100", async () => {
+    (prisma.user.findMany as unknown as jest.Mock).mockResolvedValue([]);
+    (prisma.user.count as unknown as jest.Mock).mockResolvedValue(0);
+
+    const req = new Request("http://localhost:3000/api/admin/users?status= approved &search= alice &page=2&limit=1000");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.user.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          status: "APPROVED",
+          OR: [
+            { address: { contains: "alice" } },
+            { email: { contains: "alice" } },
+          ],
+        }),
+        skip: 100,
+        take: 100,
+      })
+    );
+  });
+
+  test("GET returns 500 when query fails", async () => {
+    (prisma.user.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/admin/users");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("PATCH rejects invalid action", async () => {
     const req = new Request("http://localhost:3000/api/admin/users", {
       method: "PATCH",
@@ -71,6 +113,34 @@ describe("Admin Users API", () => {
     });
 
     const res = await PATCH(req);
+    expect(res.status).toBe(400);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 403 when request is not admin", async () => {
+    (isAdminRequest as unknown as jest.Mock).mockResolvedValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "u1", action: "APPROVE" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(403);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects missing userId", async () => {
+    const req = new Request("http://localhost:3000/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "APPROVE" }),
+    });
+
+    const res = await PATCH(req);
+
     expect(res.status).toBe(400);
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
@@ -135,5 +205,20 @@ describe("Admin Users API", () => {
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
     expect(sendAccountStatusEmail).toHaveBeenCalledWith("u1@test.com", "RESTORED");
     expect(sendAccountStatusSms).toHaveBeenCalledWith("+12345678901", "RESTORED");
+  });
+
+  test("PATCH returns 500 for unexpected errors", async () => {
+    (prisma.user.update as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/admin/users", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "u1", action: "SUSPEND" }),
+    });
+
+    const res = await PATCH(req);
+    expect(res.status).toBe(500);
+    expect(prisma.notification.create).not.toHaveBeenCalled();
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
   });
 });
