@@ -44,6 +44,28 @@ describe("Admin Bookings API", () => {
     expect(res.status).toBe(500);
   });
 
+  test("GET returns bookings summary counts", async () => {
+    (prisma.booking.findMany as unknown as jest.Mock).mockResolvedValue([
+      { id: "b1", status: "PENDING" },
+      { id: "b2", status: "CONFIRMED" },
+      { id: "b3", status: "COMPLETED" },
+      { id: "b4", status: "CANCELLED" },
+      { id: "b5", status: "PENDING" },
+    ]);
+
+    const res = await GET();
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.summary).toEqual({
+      total: 5,
+      pending: 2,
+      confirmed: 1,
+      completed: 1,
+      cancelled: 1,
+    });
+  });
+
   test("PATCH rejects invalid action", async () => {
     const req = new Request("http://localhost:3000/api/admin/bookings", {
       method: "PATCH",
@@ -147,6 +169,123 @@ describe("Admin Bookings API", () => {
     );
     expect(prisma.notification.create).toHaveBeenCalledTimes(1);
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("PATCH trims bookingId before lookup", async () => {
+    (prisma.booking.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "b-trim",
+      userId: "u1",
+      chamberName: "Heart Clinic",
+      date: "2026-03-01",
+      timeSlot: "10:00",
+    });
+
+    (prisma.booking.update as unknown as jest.Mock).mockResolvedValue({
+      id: "b-trim",
+      status: "CONFIRMED",
+    });
+    (prisma.notification.create as unknown as jest.Mock).mockResolvedValue({});
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "  b-trim  ", action: "CONFIRM" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.booking.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "b-trim" } })
+    );
+  });
+
+  test("PATCH completes booking and sets completedAt", async () => {
+    (prisma.booking.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "b2",
+      userId: "u1",
+      chamberName: "Heart Clinic",
+      date: "2026-03-02",
+      timeSlot: "11:00",
+    });
+
+    (prisma.booking.update as unknown as jest.Mock).mockResolvedValue({ id: "b2", status: "COMPLETED" });
+    (prisma.notification.create as unknown as jest.Mock).mockResolvedValue({});
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "b2", action: "COMPLETE" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "COMPLETED", completedAt: expect.any(Date) }),
+      })
+    );
+  });
+
+  test("PATCH cancels booking and sets cancelledAt", async () => {
+    (prisma.booking.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "b3",
+      userId: "u1",
+      chamberName: "Heart Clinic",
+      date: "2026-03-03",
+      timeSlot: "12:00",
+    });
+
+    (prisma.booking.update as unknown as jest.Mock).mockResolvedValue({ id: "b3", status: "CANCELLED" });
+    (prisma.notification.create as unknown as jest.Mock).mockResolvedValue({});
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "b3", action: "CANCEL" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "CANCELLED", cancelledAt: expect.any(Date) }),
+      })
+    );
+  });
+
+  test("PATCH marks booking as no show", async () => {
+    (prisma.booking.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "b4",
+      userId: "u1",
+      chamberName: "Heart Clinic",
+      date: "2026-03-04",
+      timeSlot: "13:00",
+    });
+
+    (prisma.booking.update as unknown as jest.Mock).mockResolvedValue({ id: "b4", status: "NO_SHOW" });
+    (prisma.notification.create as unknown as jest.Mock).mockResolvedValue({});
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "b4", action: "NO_SHOW" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.booking.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "NO_SHOW" }),
+      })
+    );
   });
 
   test("PATCH returns 500 on unexpected errors", async () => {
