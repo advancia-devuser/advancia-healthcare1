@@ -60,11 +60,62 @@ describe("Bills API", () => {
     );
   });
 
+  test("GET normalizes status and caps limit at 100", async () => {
+    (prisma.billPayment.findMany as unknown as jest.Mock).mockResolvedValue([]);
+    (prisma.billPayment.count as unknown as jest.Mock).mockResolvedValue(0);
+
+    const req = new Request("http://localhost:3000/api/bills?status= paid &page=2&limit=999");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.billPayment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "u1", status: "PAID" },
+        skip: 100,
+        take: 100,
+      })
+    );
+  });
+
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/bills");
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.billPayment.findMany).not.toHaveBeenCalled();
+  });
+
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.billPayment.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/bills");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("POST rejects invalid amount", async () => {
     const req = new Request("http://localhost:3000/api/bills", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ billerName: "Power", accountNumber: "123", amount: "10.5" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects missing required fields", async () => {
+    const req = new Request("http://localhost:3000/api/bills", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ billerName: "Power" }),
     });
 
     const res = await POST(req);
@@ -91,6 +142,24 @@ describe("Bills API", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ billerName: "Power", accountNumber: "123", amount: "10", chainId: "bad" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects invalid scheduledFor date", async () => {
+    const req = new Request("http://localhost:3000/api/bills", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        billerName: "Power",
+        accountNumber: "123",
+        amount: "10",
+        scheduledFor: "not-a-date",
+      }),
     });
 
     const res = await POST(req);
@@ -178,5 +247,37 @@ describe("Bills API", () => {
     const res = await POST(req);
 
     expect(res.status).toBe(400);
+  });
+
+  test("POST passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Forbidden" }, { status: 403 })
+    );
+
+    const req = new Request("http://localhost:3000/api/bills", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ billerName: "Power", accountNumber: "123", amount: "10" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(403);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST returns 500 on unexpected errors", async () => {
+    (prisma.billPayment.create as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+    const future = new Date(Date.now() + 3600_000).toISOString();
+
+    const req = new Request("http://localhost:3000/api/bills", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ billerName: "Power", accountNumber: "123", amount: "10", scheduledFor: future }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
   });
 });
