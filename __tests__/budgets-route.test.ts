@@ -58,6 +58,27 @@ describe("Budgets API", () => {
     expect(body.summary.totalLimit).toBe("100");
   });
 
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/budgets");
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.budget.findMany).not.toHaveBeenCalled();
+  });
+
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.budget.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/budgets");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("POST rejects invalid limit amount", async () => {
     const req = new Request("http://localhost:3000/api/budgets", {
       method: "POST",
@@ -103,6 +124,38 @@ describe("Budgets API", () => {
     expect(prisma.budget.create).not.toHaveBeenCalled();
   });
 
+  test("POST rejects invalid periodStart", async () => {
+    const req = new Request("http://localhost:3000/api/budgets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: "Food",
+        category: "food",
+        limitAmount: "100",
+        periodStart: "not-a-date",
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.budget.create).not.toHaveBeenCalled();
+  });
+
+  test("POST returns 500 on unexpected errors", async () => {
+    (prisma.budget.create as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/budgets", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Food", category: "food", limitAmount: "100" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("POST creates budget with normalized values", async () => {
     (prisma.budget.create as unknown as jest.Mock).mockResolvedValue({ id: "b1", name: "Food" });
     (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({ id: "a1" });
@@ -146,6 +199,33 @@ describe("Budgets API", () => {
 
     expect(res.status).toBe(400);
     expect(prisma.budget.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects missing budgetId", async () => {
+    const req = new Request("http://localhost:3000/api/budgets", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ limitAmount: "200" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.budget.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 500 on unexpected errors", async () => {
+    (prisma.budget.findFirst as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/budgets", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ budgetId: "b1", limitAmount: "200" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(500);
   });
 
   test("PATCH returns 400 for malformed JSON body", async () => {
@@ -264,5 +344,36 @@ describe("Budgets API", () => {
     expect(prisma.budget.deleteMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "b1", userId: "u1" } })
     );
+  });
+
+  test("DELETE passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Rate limited" }, { status: 429 })
+    );
+
+    const req = new Request("http://localhost:3000/api/budgets", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ budgetId: "b1" }),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(429);
+    expect(prisma.budget.deleteMany).not.toHaveBeenCalled();
+  });
+
+  test("DELETE returns 500 on unexpected errors", async () => {
+    (prisma.budget.deleteMany as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/budgets", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ budgetId: "b1" }),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(500);
   });
 });
