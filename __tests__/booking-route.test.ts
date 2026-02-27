@@ -61,6 +61,27 @@ describe("Booking API", () => {
     );
   });
 
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/booking");
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.booking.findMany).not.toHaveBeenCalled();
+  });
+
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.booking.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/booking");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("POST rejects invalid chamber", async () => {
     const req = new Request("http://localhost:3000/api/booking", {
       method: "POST",
@@ -71,6 +92,53 @@ describe("Booking API", () => {
     const res = await POST(req);
 
     expect(res.status).toBe(400);
+    expect(prisma.booking.create).not.toHaveBeenCalled();
+  });
+
+  test("POST returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/booking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.booking.create).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects invalid time slot", async () => {
+    const req = new Request("http://localhost:3000/api/booking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chamber: "alpha", date: futureDate(), timeSlot: "10:00 AM" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.booking.create).not.toHaveBeenCalled();
+  });
+
+  test("POST maps wallet debit failure to 402", async () => {
+    (prisma.booking.findFirst as unknown as jest.Mock).mockResolvedValue(null);
+    (debitWallet as unknown as jest.Mock).mockRejectedValue(new Error("Insufficient balance"));
+
+    const req = new Request("http://localhost:3000/api/booking", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chamber: "alpha",
+        date: futureDate(),
+        timeSlot: "09:00 AM",
+        payWithWallet: true,
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(402);
     expect(prisma.booking.create).not.toHaveBeenCalled();
   });
 
@@ -201,6 +269,51 @@ describe("Booking API", () => {
     const res = await PATCH(req);
 
     expect(res.status).toBe(404);
+    expect(prisma.booking.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects booking already cancelled", async () => {
+    (prisma.booking.findFirst as unknown as jest.Mock).mockResolvedValue({
+      id: "b1",
+      userId: "u1",
+      date: futureDate(3),
+      status: "CANCELLED",
+      paidWithAsset: null,
+      paidAmount: null,
+    });
+
+    const req = new Request("http://localhost:3000/api/booking", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "b1" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.booking.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects cancellation within 24 hours", async () => {
+    const nearDate = new Date(Date.now() + 6 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    (prisma.booking.findFirst as unknown as jest.Mock).mockResolvedValue({
+      id: "b1",
+      userId: "u1",
+      date: nearDate,
+      status: "CONFIRMED",
+      paidWithAsset: null,
+      paidAmount: null,
+    });
+
+    const req = new Request("http://localhost:3000/api/booking", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "b1" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
     expect(prisma.booking.update).not.toHaveBeenCalled();
   });
 
