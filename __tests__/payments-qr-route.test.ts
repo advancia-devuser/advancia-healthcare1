@@ -71,6 +71,19 @@ describe("Payments QR API", () => {
     expect(res.status).toBe(400);
   });
 
+  test("POST returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/payments/qr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.paymentRequest.findUnique).not.toHaveBeenCalled();
+  });
+
   test("POST rejects invalid qrData payload", async () => {
     const req = new Request("http://localhost:3000/api/payments/qr", {
       method: "POST",
