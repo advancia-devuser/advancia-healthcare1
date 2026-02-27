@@ -58,6 +58,31 @@ describe("Notifications API", () => {
     );
   });
 
+  test("GET caps limit at 100", async () => {
+    (prisma.notification.findMany as unknown as jest.Mock).mockResolvedValue([]);
+    (prisma.notification.count as unknown as jest.Mock).mockResolvedValueOnce(150).mockResolvedValueOnce(0);
+
+    const req = new Request("http://localhost:3000/api/notifications?page=2&limit=999");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.notification.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 100,
+        take: 100,
+      })
+    );
+  });
+
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.notification.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/notifications");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("GET passes through thrown Response errors", async () => {
     (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
       Response.json({ error: "Denied" }, { status: 403 })
@@ -147,6 +172,37 @@ describe("Notifications API", () => {
     expect(prisma.notification.updateMany).not.toHaveBeenCalled();
   });
 
+  test("PATCH passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markAllRead: true }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.notification.updateMany).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 500 on unexpected errors", async () => {
+    (prisma.notification.updateMany as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ markAllRead: true }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("DELETE rejects missing notificationId", async () => {
     const req = new Request("http://localhost:3000/api/notifications", {
       method: "DELETE",
@@ -207,5 +263,19 @@ describe("Notifications API", () => {
     const body = await res.json();
     expect(body.error).toBe("Too many requests");
     expect(prisma.notification.deleteMany).not.toHaveBeenCalled();
+  });
+
+  test("DELETE returns 500 on unexpected errors", async () => {
+    (prisma.notification.deleteMany as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: "n1" }),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(500);
   });
 });
