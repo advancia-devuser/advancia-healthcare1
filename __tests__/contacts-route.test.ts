@@ -73,6 +73,15 @@ describe("Contacts API", () => {
     expect(prisma.contact.findMany).not.toHaveBeenCalled();
   });
 
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.contact.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/contacts");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("POST rejects missing required fields", async () => {
     const req = new Request("http://localhost:3000/api/contacts", {
       method: "POST",
@@ -165,6 +174,37 @@ describe("Contacts API", () => {
     expect(res.status).toBe(409);
   });
 
+  test("POST passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Forbidden" }, { status: 403 })
+    );
+
+    const req = new Request("http://localhost:3000/api/contacts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Alice", address: "0xabc" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(403);
+    expect(prisma.contact.create).not.toHaveBeenCalled();
+  });
+
+  test("POST returns 500 on unexpected errors", async () => {
+    (prisma.contact.create as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/contacts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Alice", address: "0xabc" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("DELETE rejects missing contactId", async () => {
     const req = new Request("http://localhost:3000/api/contacts", {
       method: "DELETE",
@@ -225,5 +265,19 @@ describe("Contacts API", () => {
     const body = await res.json();
     expect(body.error).toBe("Rate limited");
     expect(prisma.contact.deleteMany).not.toHaveBeenCalled();
+  });
+
+  test("DELETE returns 500 on unexpected errors", async () => {
+    (prisma.contact.deleteMany as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/contacts", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contactId: "c1" }),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(500);
   });
 });
