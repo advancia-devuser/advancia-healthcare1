@@ -101,7 +101,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const body: unknown = await request.json();
+    const body: unknown = await request.json().catch(() => null);
     if (!body || typeof body !== "object") {
       return badRequest("Invalid request body");
     }
@@ -224,7 +224,7 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const body: unknown = await request.json();
+    const body: unknown = await request.json().catch(() => null);
     if (!body || typeof body !== "object") {
       return badRequest("Invalid request body");
     }

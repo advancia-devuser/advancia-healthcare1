@@ -42,6 +42,19 @@ describe("Admin Ledger API", () => {
     expect(creditWallet).not.toHaveBeenCalled();
   });
 
+  test("POST returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/admin/ledger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(creditWallet).not.toHaveBeenCalled();
+  });
+
   test("POST rejects invalid type", async () => {
     const req = new Request("http://localhost:3000/api/admin/ledger", {
       method: "POST",
@@ -115,6 +128,19 @@ describe("Admin Ledger API", () => {
     const res = await PATCH(req);
 
     expect(res.status).toBe(400);
+  });
+
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/admin/ledger", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(debitWallet).not.toHaveBeenCalled();
   });
 
   test("PATCH maps duplicate txHash to 409", async () => {
