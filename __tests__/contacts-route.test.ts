@@ -45,6 +45,34 @@ describe("Contacts API", () => {
     );
   });
 
+  test("GET without search does not include OR filters", async () => {
+    (prisma.contact.findMany as unknown as jest.Mock).mockResolvedValue([]);
+
+    const req = new Request("http://localhost:3000/api/contacts");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.contact.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { userId: "u1" },
+      })
+    );
+  });
+
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/contacts");
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error).toBe("Unauthorized");
+    expect(prisma.contact.findMany).not.toHaveBeenCalled();
+  });
+
   test("POST rejects missing required fields", async () => {
     const req = new Request("http://localhost:3000/api/contacts", {
       method: "POST",
@@ -178,5 +206,24 @@ describe("Contacts API", () => {
     expect(prisma.contact.deleteMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "c1", userId: "u1" } })
     );
+  });
+
+  test("DELETE passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Rate limited" }, { status: 429 })
+    );
+
+    const req = new Request("http://localhost:3000/api/contacts", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contactId: "c1" }),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.error).toBe("Rate limited");
+    expect(prisma.contact.deleteMany).not.toHaveBeenCalled();
   });
 });
