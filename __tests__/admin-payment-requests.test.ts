@@ -65,6 +65,19 @@ describe("Admin Payment Requests API", () => {
     expect(prisma.paymentRequest.findUnique).not.toHaveBeenCalled();
   });
 
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/admin/payment-requests", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.paymentRequest.findUnique).not.toHaveBeenCalled();
+  });
+
   test("PATCH returns 404 when request is missing", async () => {
     (prisma.paymentRequest.findUnique as unknown as jest.Mock).mockResolvedValue(null);
 
