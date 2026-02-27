@@ -66,6 +66,28 @@ describe("Bank Accounts API", () => {
     expect(prisma.bankAccount.findMany).not.toHaveBeenCalled();
   });
 
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.bankAccount.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/bank-accounts");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
+  test("POST rejects missing bankName/accountLast4", async () => {
+    const req = new Request("http://localhost:3000/api/bank-accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.bankAccount.create).not.toHaveBeenCalled();
+  });
+
   test("POST rejects invalid accountLast4", async () => {
     const req = new Request("http://localhost:3000/api/bank-accounts", {
       method: "POST",
@@ -206,6 +228,20 @@ describe("Bank Accounts API", () => {
     expect(prisma.bankAccount.create).not.toHaveBeenCalled();
   });
 
+  test("POST returns 500 on unexpected errors", async () => {
+    (prisma.bankAccount.create as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/bank-accounts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bankName: "Acme", accountLast4: "5678" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("DELETE rejects missing accountId", async () => {
     const req = new Request("http://localhost:3000/api/bank-accounts", {
       method: "DELETE",
@@ -284,5 +320,19 @@ describe("Bank Accounts API", () => {
     const body = await res.json();
     expect(body.error).toBe("Too many requests");
     expect(prisma.bankAccount.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("DELETE returns 500 on unexpected errors", async () => {
+    (prisma.bankAccount.findFirst as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/bank-accounts", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ accountId: "a1" }),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(500);
   });
 });
