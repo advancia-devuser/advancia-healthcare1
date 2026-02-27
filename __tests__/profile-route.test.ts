@@ -65,6 +65,16 @@ describe("Profile API", () => {
     expect(prisma.wallet.findUnique).not.toHaveBeenCalled();
   });
 
+  test("GET returns 500 on unexpected error", async () => {
+    (getAuthUser as unknown as jest.Mock).mockRejectedValue(new Error("boom"));
+
+    const req = new Request("http://localhost:3000/api/profile");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+    expect(prisma.wallet.findUnique).not.toHaveBeenCalled();
+  });
+
   test("GET returns profile payload for authenticated user", async () => {
     const req = new Request("http://localhost:3000/api/profile");
     const res = await GET(req);
@@ -215,6 +225,21 @@ describe("Profile API", () => {
     const res = await PATCH(req);
 
     expect(res.status).toBe(401);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 500 on unexpected error", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(new Error("boom"));
+
+    const req = new Request("http://localhost:3000/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Alice" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(500);
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
