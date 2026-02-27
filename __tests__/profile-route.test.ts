@@ -187,6 +187,19 @@ describe("Profile API", () => {
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
+  test("PATCH returns 400 for non-string name value", async () => {
+    const req = new Request("http://localhost:3000/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: 123 }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
   test("PATCH returns 400 for empty phone string", async () => {
     const req = new Request("http://localhost:3000/api/profile", {
       method: "PATCH",
@@ -205,6 +218,19 @@ describe("Profile API", () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ avatarUrl: "   " }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 400 for non-string avatarUrl value", async () => {
+    const req = new Request("http://localhost:3000/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ avatarUrl: { url: "https://example.com/a.png" } }),
     });
 
     const res = await PATCH(req);
