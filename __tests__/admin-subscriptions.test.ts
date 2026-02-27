@@ -33,11 +33,47 @@ describe("Admin Subscriptions API", () => {
     expect(res.status).toBe(403);
   });
 
+  test("GET returns 500 when query fails", async () => {
+    (prisma.subscription.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const res = await GET();
+
+    expect(res.status).toBe(500);
+  });
+
   test("PATCH rejects invalid action", async () => {
     const req = new Request("http://localhost:3000/api/admin/subscriptions", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ subscriptionId: "s1", action: "INVALID" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.subscription.findUnique).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 403 for non-admin", async () => {
+    (isAdminRequest as unknown as jest.Mock).mockResolvedValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/subscriptions", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscriptionId: "s1", action: "PAUSE" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(403);
+    expect(prisma.subscription.findUnique).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects missing subscriptionId", async () => {
+    const req = new Request("http://localhost:3000/api/admin/subscriptions", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "PAUSE" }),
     });
 
     const res = await PATCH(req);
@@ -127,5 +163,26 @@ describe("Admin Subscriptions API", () => {
       })
     );
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("PATCH returns 500 on unexpected errors", async () => {
+    (prisma.subscription.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "s1",
+      userId: "u1",
+      status: "ACTIVE",
+      tier: "BASIC",
+    });
+    (prisma.subscription.update as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/admin/subscriptions", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subscriptionId: "s1", action: "PAUSE" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(500);
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
   });
 });
