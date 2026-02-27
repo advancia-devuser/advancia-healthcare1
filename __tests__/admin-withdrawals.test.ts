@@ -50,6 +50,16 @@ describe("Admin Withdrawals API", () => {
     );
   });
 
+  test("GET returns 403 when request is not admin", async () => {
+    (isAdminRequest as unknown as jest.Mock).mockResolvedValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/withdrawals");
+    const res = await GET(req);
+
+    expect(res.status).toBe(403);
+    expect(prisma.withdrawal.findMany).not.toHaveBeenCalled();
+  });
+
   test("GET returns 400 for invalid status", async () => {
     const req = new Request("http://localhost:3000/api/admin/withdrawals?status=invalid");
     const res = await GET(req);
@@ -84,6 +94,21 @@ describe("Admin Withdrawals API", () => {
     const res = await PATCH(req);
 
     expect(res.status).toBe(400);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 403 when request is not admin", async () => {
+    (isAdminRequest as unknown as jest.Mock).mockResolvedValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/withdrawals", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ withdrawalId: "w1", action: "APPROVE" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(403);
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
@@ -171,5 +196,57 @@ describe("Admin Withdrawals API", () => {
     expect(sendWithdrawalEmail).toHaveBeenCalledWith("u1@test.com", "APPROVED", "1.5", "ETH");
     expect(sendWithdrawalSms).toHaveBeenCalledWith("+12345678901", "APPROVED", "1.5", "ETH");
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("PATCH maps insufficient balance errors to 400", async () => {
+    (txMock.withdrawal.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "w1",
+      userId: "u1",
+      status: "PENDING",
+      amount: "10",
+      asset: "ETH",
+      chainId: 1,
+      toAddress: "0xabc",
+      user: { email: "u1@test.com", phone: "+12345678901", address: "0x1" },
+    });
+
+    (debitWallet as unknown as jest.Mock).mockRejectedValue(new Error("Insufficient balance: have 1, need 10"));
+
+    const req = new Request("http://localhost:3000/api/admin/withdrawals", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ withdrawalId: "w1", action: "APPROVE" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 500 for unexpected errors", async () => {
+    (txMock.withdrawal.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "w1",
+      userId: "u1",
+      status: "PENDING",
+      amount: "10",
+      asset: "ETH",
+      chainId: 1,
+      toAddress: "0xabc",
+      user: { email: "u1@test.com", phone: "+12345678901", address: "0x1" },
+    });
+
+    (debitWallet as unknown as jest.Mock).mockRejectedValue(new Error("Unexpected ledger failure"));
+
+    const req = new Request("http://localhost:3000/api/admin/withdrawals", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ withdrawalId: "w1", action: "APPROVE" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(500);
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
   });
 });
