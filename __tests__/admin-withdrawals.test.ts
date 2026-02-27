@@ -84,6 +84,15 @@ describe("Admin Withdrawals API", () => {
     );
   });
 
+  test("GET returns 500 when database query fails", async () => {
+    (prisma.withdrawal.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/admin/withdrawals");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("PATCH rejects invalid action", async () => {
     const req = new Request("http://localhost:3000/api/admin/withdrawals", {
       method: "PATCH",
@@ -195,6 +204,43 @@ describe("Admin Withdrawals API", () => {
     expect(debitWallet).toHaveBeenCalledTimes(1);
     expect(sendWithdrawalEmail).toHaveBeenCalledWith("u1@test.com", "APPROVED", "1.5", "ETH");
     expect(sendWithdrawalSms).toHaveBeenCalledWith("+12345678901", "APPROVED", "1.5", "ETH");
+    expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("PATCH rejects pending withdrawal and writes audit log", async () => {
+    (txMock.withdrawal.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "w2",
+      userId: "u1",
+      status: "PENDING",
+      amount: "2.0",
+      asset: "ETH",
+      chainId: 1,
+      toAddress: "0xdef",
+      user: { email: "u1@test.com", phone: "+12345678901", address: "0x1" },
+    });
+
+    (txMock.withdrawal.update as unknown as jest.Mock).mockResolvedValue({
+      id: "w2",
+      userId: "u1",
+      amount: "2.0",
+      asset: "ETH",
+      user: { email: "u1@test.com", phone: "+12345678901" },
+    });
+
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/withdrawals", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ withdrawalId: "w2", action: "REJECT" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(debitWallet).not.toHaveBeenCalled();
+    expect(sendWithdrawalEmail).toHaveBeenCalledWith("u1@test.com", "REJECTED", "2.0", "ETH");
+    expect(sendWithdrawalSms).toHaveBeenCalledWith("+12345678901", "REJECTED", "2.0", "ETH");
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
   });
 
