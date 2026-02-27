@@ -75,6 +75,22 @@ describe("Profile API", () => {
     expect(json.wallet.balance).toBe("10");
   });
 
+  test("GET maps security flags has2FA and hasPin", async () => {
+    (getAuthUser as unknown as jest.Mock).mockResolvedValue({
+      ...authedUser,
+      twoFaSecret: "enc-secret",
+      pin: "hashed-pin",
+    });
+
+    const req = new Request("http://localhost:3000/api/profile");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.user.has2FA).toBe(true);
+    expect(json.user.hasPin).toBe(true);
+  });
+
   test("GET returns null wallet and active subscription when present", async () => {
     (prisma.wallet.findUnique as unknown as jest.Mock).mockResolvedValue(null);
     (prisma.walletBalance.findMany as unknown as jest.Mock).mockResolvedValue([]);
@@ -127,6 +143,32 @@ describe("Profile API", () => {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name: "   " }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 400 for empty phone string", async () => {
+    const req = new Request("http://localhost:3000/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: "   " }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 400 for empty avatarUrl string", async () => {
+    const req = new Request("http://localhost:3000/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ avatarUrl: "   " }),
     });
 
     const res = await PATCH(req);
