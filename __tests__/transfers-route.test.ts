@@ -64,6 +64,45 @@ describe("Transfers API", () => {
     );
   });
 
+  test("GET caps limit at 100", async () => {
+    (prisma.wallet.findUnique as unknown as jest.Mock).mockResolvedValue({ userId: "u1" });
+    (prisma.transaction.findMany as unknown as jest.Mock).mockResolvedValue([]);
+    (prisma.transaction.count as unknown as jest.Mock).mockResolvedValue(150);
+
+    const req = new Request("http://localhost:3000/api/transfers?page=2&limit=999");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.transaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 100,
+        take: 100,
+      })
+    );
+  });
+
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Denied" }, { status: 403 })
+    );
+
+    const req = new Request("http://localhost:3000/api/transfers");
+    const res = await GET(req);
+
+    expect(res.status).toBe(403);
+    expect(prisma.wallet.findUnique).not.toHaveBeenCalled();
+  });
+
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.wallet.findUnique as unknown as jest.Mock).mockResolvedValue({ userId: "u1" });
+    (prisma.transaction.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/transfers");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("GET returns empty payload when user has no wallet", async () => {
     (prisma.wallet.findUnique as unknown as jest.Mock).mockResolvedValue(null);
 
@@ -81,6 +120,19 @@ describe("Transfers API", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ recipientAddress: "0xdef456", amount: "1.5" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(transferInternal).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects missing recipientAddress", async () => {
+    const req = new Request("http://localhost:3000/api/transfers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: "10" }),
     });
 
     const res = await POST(req);
@@ -112,6 +164,20 @@ describe("Transfers API", () => {
     const res = await POST(req);
 
     expect(res.status).toBe(400);
+    expect(transferInternal).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects non-string pin", async () => {
+    const req = new Request("http://localhost:3000/api/transfers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipientAddress: "0xdef456", amount: "10", pin: 1234 }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(verifyUserPin).not.toHaveBeenCalled();
     expect(transferInternal).not.toHaveBeenCalled();
   });
 
@@ -217,5 +283,21 @@ describe("Transfers API", () => {
     const res = await POST(req);
 
     expect(res.status).toBe(400);
+  });
+
+  test("POST returns 500 on unexpected errors", async () => {
+    (prisma.user.findUnique as unknown as jest.Mock).mockResolvedValue({ id: "u2", address: "0xdef456" });
+    (prisma.wallet.findUnique as unknown as jest.Mock).mockResolvedValue({ userId: "u2" });
+    (transferInternal as unknown as jest.Mock).mockRejectedValue(new Error("ledger failure"));
+
+    const req = new Request("http://localhost:3000/api/transfers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipientAddress: "0xdef456", amount: "10" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
   });
 });
