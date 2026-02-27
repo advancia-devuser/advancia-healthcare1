@@ -34,6 +34,16 @@ describe("Admin Installments API", () => {
     );
   });
 
+  test("GET returns 403 when request is not admin", async () => {
+    (isAdminRequest as unknown as jest.Mock).mockResolvedValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/installments");
+    const res = await GET(req);
+
+    expect(res.status).toBe(403);
+    expect(prisma.installment.findMany).not.toHaveBeenCalled();
+  });
+
   test("GET falls back to defaults for invalid pagination", async () => {
     (prisma.installment.findMany as unknown as jest.Mock).mockResolvedValue([]);
     (prisma.installment.count as unknown as jest.Mock).mockResolvedValue(0);
@@ -48,6 +58,133 @@ describe("Admin Installments API", () => {
         take: 20,
       })
     );
+  });
+
+  test("GET caps limit at 100", async () => {
+    (prisma.installment.findMany as unknown as jest.Mock).mockResolvedValue([]);
+    (prisma.installment.count as unknown as jest.Mock).mockResolvedValue(0);
+
+    const req = new Request("http://localhost:3000/api/admin/installments?page=2&limit=999");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.installment.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 100,
+        take: 100,
+      })
+    );
+  });
+
+  test("GET returns 500 when query fails", async () => {
+    (prisma.installment.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/admin/installments");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
+  test("POST returns 403 when request is not admin", async () => {
+    (isAdminRequest as unknown as jest.Mock).mockResolvedValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/installments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: "u1",
+        totalAmount: "100",
+        interestRate: "10",
+        installmentCount: 3,
+        frequency: "MONTHLY",
+        startDate: "2026-02-01T00:00:00.000Z",
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(403);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects missing userId", async () => {
+    const req = new Request("http://localhost:3000/api/admin/installments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        totalAmount: "100",
+        interestRate: "10",
+        installmentCount: 3,
+        frequency: "MONTHLY",
+        startDate: "2026-02-01T00:00:00.000Z",
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects non-positive totalAmount", async () => {
+    const req = new Request("http://localhost:3000/api/admin/installments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: "u1",
+        totalAmount: "0",
+        interestRate: "10",
+        installmentCount: 3,
+        frequency: "MONTHLY",
+        startDate: "2026-02-01T00:00:00.000Z",
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects negative interestRate", async () => {
+    const req = new Request("http://localhost:3000/api/admin/installments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: "u1",
+        totalAmount: "100",
+        interestRate: "-1",
+        installmentCount: 3,
+        frequency: "MONTHLY",
+        startDate: "2026-02-01T00:00:00.000Z",
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  test("POST returns 500 for unexpected errors", async () => {
+    (prisma.$transaction as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/admin/installments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: "u1",
+        totalAmount: "100",
+        interestRate: "10",
+        installmentCount: 2,
+        frequency: "MONTHLY",
+        startDate: "2026-02-01T00:00:00.000Z",
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
   });
 
   test("POST rejects invalid frequency", async () => {
