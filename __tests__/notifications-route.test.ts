@@ -58,6 +58,20 @@ describe("Notifications API", () => {
     );
   });
 
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Denied" }, { status: 403 })
+    );
+
+    const req = new Request("http://localhost:3000/api/notifications");
+    const res = await GET(req);
+
+    expect(res.status).toBe(403);
+    const body = await res.json();
+    expect(body.error).toBe("Denied");
+    expect(prisma.notification.findMany).not.toHaveBeenCalled();
+  });
+
   test("PATCH marks all notifications read", async () => {
     (prisma.notification.updateMany as unknown as jest.Mock).mockResolvedValue({ count: 3 });
 
@@ -120,6 +134,19 @@ describe("Notifications API", () => {
     expect(prisma.notification.updateMany).not.toHaveBeenCalled();
   });
 
+  test("PATCH rejects notificationIds with no valid string ids", async () => {
+    const req = new Request("http://localhost:3000/api/notifications", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationIds: [123, null, "   "] }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.notification.updateMany).not.toHaveBeenCalled();
+  });
+
   test("DELETE rejects missing notificationId", async () => {
     const req = new Request("http://localhost:3000/api/notifications", {
       method: "DELETE",
@@ -161,5 +188,24 @@ describe("Notifications API", () => {
     expect(prisma.notification.deleteMany).toHaveBeenCalledWith(
       expect.objectContaining({ where: { id: "n1", userId: "u1" } })
     );
+  });
+
+  test("DELETE passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Too many requests" }, { status: 429 })
+    );
+
+    const req = new Request("http://localhost:3000/api/notifications", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ notificationId: "n1" }),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(429);
+    const body = await res.json();
+    expect(body.error).toBe("Too many requests");
+    expect(prisma.notification.deleteMany).not.toHaveBeenCalled();
   });
 });
