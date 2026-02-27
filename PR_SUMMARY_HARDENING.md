@@ -6,12 +6,14 @@
 - Preserved existing business behavior while tightening request-shape validation and response consistency.
 
 ## Scope
+
 - Auth + Admin routes (`admin/login`, `admin/2fa`, `auth/register`, admin cards/users/subscriptions/installments/bookings/payment-requests/withdrawals/wallet/ledger).
 - User-facing operational routes (booking, bills, health reminders, payments qr/request, and related financial utility endpoints).
 
 ## Validation
+
 - Route-level focused tests were run per hardening increment.
-- Final full-suite status: **338 passed, 0 failed**.
+- Latest full-suite status after follow-up branch-coverage expansions: **450 passed, 0 failed**.
 - Repo-wide check for raw `await request.json();` in `app/api/**/route.ts`: **no matches**.
 
 ## Commit window
