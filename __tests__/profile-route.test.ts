@@ -101,6 +101,34 @@ describe("Profile API", () => {
     expect(prisma.user.update).not.toHaveBeenCalled();
   });
 
+  test("PATCH returns 400 when no updatable fields are provided", async () => {
+    const req = new Request("http://localhost:3000/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 401 when unauthorized", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockResolvedValue(null);
+
+    const req = new Request("http://localhost:3000/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "Alice" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.user.update).not.toHaveBeenCalled();
+  });
+
   test("PATCH normalizes fields and updates profile", async () => {
     (prisma.user.update as unknown as jest.Mock).mockResolvedValue({
       ...authedUser,
