@@ -52,6 +52,29 @@ describe("Admin Wallet API", () => {
     expect(res.status).toBe(500);
   });
 
+  test("GET returns wallets, transactions, revenue, and stats", async () => {
+    (prisma.adminWallet.findMany as unknown as jest.Mock).mockResolvedValue([{ id: "w1", asset: "ETH" }]);
+    (prisma.adminTransaction.findMany as unknown as jest.Mock)
+      .mockResolvedValueOnce([{ id: "t-new" }])
+      .mockResolvedValueOnce([
+        { asset: "ETH", amount: "2" },
+        { asset: "ETH", amount: "3" },
+        { asset: "USDC", amount: "7" },
+      ]);
+    (prisma.user.count as unknown as jest.Mock).mockResolvedValue(10);
+    (prisma.subscription.count as unknown as jest.Mock).mockResolvedValue(4);
+    (prisma.booking.count as unknown as jest.Mock).mockResolvedValue(6);
+
+    const res = await GET();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.wallets).toEqual([{ id: "w1", asset: "ETH" }]);
+    expect(body.transactions).toEqual([{ id: "t-new" }]);
+    expect(body.revenue).toEqual({ ETH: "5", USDC: "7" });
+    expect(body.stats).toEqual({ totalUsers: 10, totalSubscriptions: 4, totalBookings: 6 });
+  });
+
   test("POST returns 403 when not admin", async () => {
     (isAdminRequest as unknown as jest.Mock).mockResolvedValue(false);
 
@@ -72,6 +95,19 @@ describe("Admin Wallet API", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ asset: "ETH", amount: "1.5" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.adminWallet.upsert).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects missing asset", async () => {
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: "1" }),
     });
 
     const res = await POST(req);
@@ -126,6 +162,46 @@ describe("Admin Wallet API", () => {
     expect(res.status).toBe(200);
     expect(prisma.adminWallet.upsert).toHaveBeenCalledTimes(1);
     expect(prisma.adminTransaction.create).not.toHaveBeenCalled();
+  });
+
+  test("POST creates or updates wallet without CREDIT transaction when amount is zero", async () => {
+    (prisma.adminWallet.findFirst as unknown as jest.Mock).mockResolvedValue({
+      id: "w1",
+      label: "Platform Treasury",
+      asset: "ETH",
+      balance: "10",
+    });
+    (prisma.adminWallet.upsert as unknown as jest.Mock).mockResolvedValue({
+      id: "w1",
+      label: "Platform Treasury",
+      asset: "ETH",
+      balance: "10",
+    });
+
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asset: "ETH", amount: "0" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.adminTransaction.create).not.toHaveBeenCalled();
+  });
+
+  test("POST returns 500 on unexpected errors", async () => {
+    (prisma.adminWallet.findFirst as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asset: "ETH", amount: "1" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
   });
 
   test("POST credits wallet and writes CREDIT transaction", async () => {
@@ -220,6 +296,19 @@ describe("Admin Wallet API", () => {
     expect(prisma.adminWallet.findFirst).not.toHaveBeenCalled();
   });
 
+  test("PATCH rejects empty description", async () => {
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asset: "ETH", amount: "10", description: "   " }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.adminWallet.findFirst).not.toHaveBeenCalled();
+  });
+
   test("PATCH returns 404 when wallet is missing", async () => {
     (prisma.adminWallet.findFirst as unknown as jest.Mock).mockResolvedValue(null);
 
@@ -289,5 +378,26 @@ describe("Admin Wallet API", () => {
         }),
       })
     );
+  });
+
+  test("PATCH returns 500 on unexpected errors", async () => {
+    (prisma.adminWallet.findFirst as unknown as jest.Mock).mockResolvedValue({
+      id: "w1",
+      label: "Platform Treasury",
+      asset: "ETH",
+      balance: "100",
+    });
+    (prisma.adminWallet.update as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asset: "ETH", amount: "10" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(500);
+    expect(prisma.adminTransaction.create).not.toHaveBeenCalled();
   });
 });
