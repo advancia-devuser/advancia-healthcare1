@@ -87,6 +87,19 @@ describe("Admin Withdrawals API", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  test("PATCH returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/admin/withdrawals", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   test("PATCH returns 404 when withdrawal is missing", async () => {
     (txMock.withdrawal.findUnique as unknown as jest.Mock).mockResolvedValue(null);
 
