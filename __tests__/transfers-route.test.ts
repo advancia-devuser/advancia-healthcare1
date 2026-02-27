@@ -64,6 +64,18 @@ describe("Transfers API", () => {
     );
   });
 
+  test("GET returns empty payload when user has no wallet", async () => {
+    (prisma.wallet.findUnique as unknown as jest.Mock).mockResolvedValue(null);
+
+    const req = new Request("http://localhost:3000/api/transfers");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json).toEqual({ transfers: [], total: 0 });
+    expect(prisma.transaction.findMany).not.toHaveBeenCalled();
+  });
+
   test("POST rejects invalid amount format", async () => {
     const req = new Request("http://localhost:3000/api/transfers", {
       method: "POST",
@@ -115,6 +127,37 @@ describe("Transfers API", () => {
     const res = await POST(req);
 
     expect(res.status).toBe(404);
+    expect(transferInternal).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects transfer to self", async () => {
+    (prisma.user.findUnique as unknown as jest.Mock).mockResolvedValue({ id: "u1", address: "0xabc123" });
+
+    const req = new Request("http://localhost:3000/api/transfers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipientAddress: "0xAbC123", amount: "10" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(transferInternal).not.toHaveBeenCalled();
+  });
+
+  test("POST returns 400 when recipient has no wallet", async () => {
+    (prisma.user.findUnique as unknown as jest.Mock).mockResolvedValue({ id: "u2", address: "0xdef456" });
+    (prisma.wallet.findUnique as unknown as jest.Mock).mockResolvedValue(null);
+
+    const req = new Request("http://localhost:3000/api/transfers", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ recipientAddress: "0xdef456", amount: "10" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
     expect(transferInternal).not.toHaveBeenCalled();
   });
 
