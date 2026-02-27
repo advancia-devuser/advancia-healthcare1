@@ -1,5 +1,5 @@
 import { createMocks } from "node-mocks-http";
-import { GET, POST } from "@/app/api/health/cards/route";
+import { DELETE, GET, PATCH, POST } from "@/app/api/health/cards/route";
 import { prisma } from "@/lib/db";
 import { signUserToken } from "@/lib/auth";
 import { encryptJSON } from "@/lib/crypto";
@@ -13,6 +13,9 @@ jest.mock("@/lib/db", () => ({
     healthCard: {
       findMany: jest.fn(),
       create: jest.fn(),
+      findFirst: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
     },
     auditLog: {
       create: jest.fn(),
@@ -218,6 +221,82 @@ describe("Health Cards API", () => {
       (req as any).json = jest.fn().mockResolvedValue(payload);
 
       const response = await POST(req as any);
+
+      expect(response.status).toBe(500);
+    });
+  });
+
+  describe("PATCH /api/health/cards", () => {
+    it("should return 400 when cardId is missing", async () => {
+      const payload = { providerName: "Updated" };
+
+      const { req } = createMocks({
+        method: "PATCH",
+        url: "http://localhost:3000/api/health/cards",
+        headers: {
+          authorization: `Bearer ${validToken}`,
+        },
+        body: payload,
+      });
+
+      (req as any).json = jest.fn().mockResolvedValue(payload);
+
+      const response = await PATCH(req as any);
+
+      expect(response.status).toBe(400);
+      expect(prisma.healthCard.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("should return 404 when card is not found", async () => {
+      (prisma.healthCard.findFirst as jest.Mock).mockResolvedValue(null);
+      const payload = { cardId: "missing", providerName: "Updated" };
+
+      const { req } = createMocks({
+        method: "PATCH",
+        url: "http://localhost:3000/api/health/cards",
+        headers: {
+          authorization: `Bearer ${validToken}`,
+        },
+        body: payload,
+      });
+
+      (req as any).json = jest.fn().mockResolvedValue(payload);
+
+      const response = await PATCH(req as any);
+
+      expect(response.status).toBe(404);
+      expect(prisma.healthCard.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("DELETE /api/health/cards", () => {
+    it("should return 400 when cardId query param is missing", async () => {
+      const { req } = createMocks({
+        method: "DELETE",
+        url: "http://localhost:3000/api/health/cards",
+        headers: {
+          authorization: `Bearer ${validToken}`,
+        },
+      });
+
+      const response = await DELETE(req as any);
+
+      expect(response.status).toBe(400);
+      expect(prisma.healthCard.findFirst).not.toHaveBeenCalled();
+    });
+
+    it("should return 500 on unexpected delete errors", async () => {
+      (prisma.healthCard.findFirst as jest.Mock).mockRejectedValue(new Error("db down"));
+
+      const { req } = createMocks({
+        method: "DELETE",
+        url: "http://localhost:3000/api/health/cards?cardId=c1",
+        headers: {
+          authorization: `Bearer ${validToken}`,
+        },
+      });
+
+      const response = await DELETE(req as any);
 
       expect(response.status).toBe(500);
     });
