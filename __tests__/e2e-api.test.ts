@@ -387,6 +387,14 @@ describeE2E("Input Validation", () => {
     expect(status).toBe(400);
   });
 
+  test("Register with malformed JSON returns 400", async () => {
+    const { status } = await api("/api/auth/register", {
+      method: "POST",
+      body: "{",
+    });
+    expect(status).toBe(400);
+  });
+
   test("Profile PATCH with invalid email is handled", async () => {
     const { status } = await api("/api/profile", {
       method: "PATCH",
