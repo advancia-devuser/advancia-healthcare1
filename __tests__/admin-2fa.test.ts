@@ -87,6 +87,22 @@ describe("Admin 2FA API", () => {
     expect(body.enabled).toBe(false);
   });
 
+  test("status returns enabled true when secret exists", async () => {
+    (prisma.adminConfig.findUnique as unknown as jest.Mock).mockResolvedValue({ value: "ENCRYPTED" });
+
+    const req = new Request("http://localhost:3000/api/admin/2fa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "status" }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.enabled).toBe(true);
+  });
+
   test("verify rejects non-numeric 6-digit code", async () => {
     const req = new Request("http://localhost:3000/api/admin/2fa", {
       method: "POST",
@@ -118,6 +134,49 @@ describe("Admin 2FA API", () => {
     expect(body.secret).toBe("SECRET123");
     expect(body.uri).toBe("otpauth://test");
     expect(prisma.adminConfig.upsert).toHaveBeenCalledTimes(1);
+  });
+
+  test("setup rejects when 2FA is already enabled", async () => {
+    (prisma.adminConfig.findUnique as unknown as jest.Mock).mockResolvedValue({ value: "ENCRYPTED" });
+
+    const req = new Request("http://localhost:3000/api/admin/2fa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "setup" }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(prisma.adminConfig.upsert).not.toHaveBeenCalled();
+  });
+
+  test("verify returns 400 when no pending secret exists", async () => {
+    (prisma.adminConfig.findUnique as unknown as jest.Mock).mockResolvedValue(null);
+
+    const req = new Request("http://localhost:3000/api/admin/2fa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "verify", code: "123456" }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(prisma.adminConfig.upsert).not.toHaveBeenCalled();
+  });
+
+  test("verify returns 400 for incorrect 6-digit code", async () => {
+    (prisma.adminConfig.findUnique as unknown as jest.Mock).mockResolvedValue({ value: "PENDINGSECRET" });
+    (verifyTotpCode as unknown as jest.Mock).mockReturnValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/2fa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "verify", code: "123456" }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(prisma.adminConfig.upsert).not.toHaveBeenCalled();
   });
 
   test("verify enables 2FA and clears pending secret", async () => {
@@ -173,5 +232,34 @@ describe("Admin 2FA API", () => {
     expect(decrypt).toHaveBeenCalledWith("ENCRYPTED");
     expect(verifyTotpCode).toHaveBeenCalledWith("DECRYPTED", "123456");
     expect(prisma.adminConfig.delete).toHaveBeenCalledTimes(1);
+  });
+
+  test("disable returns 400 for incorrect verification code", async () => {
+    (prisma.adminConfig.findUnique as unknown as jest.Mock).mockResolvedValue({ value: "ENCRYPTED" });
+    (decrypt as unknown as jest.Mock).mockReturnValue("DECRYPTED");
+    (verifyTotpCode as unknown as jest.Mock).mockReturnValue(false);
+
+    const req = new Request("http://localhost:3000/api/admin/2fa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "disable", code: "123456" }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(prisma.adminConfig.delete).not.toHaveBeenCalled();
+  });
+
+  test("returns 500 on unexpected internal errors", async () => {
+    (prisma.adminConfig.findUnique as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/admin/2fa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "status" }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(500);
   });
 });
