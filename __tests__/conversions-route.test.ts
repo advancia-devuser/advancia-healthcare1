@@ -50,6 +50,40 @@ describe("Conversions API", () => {
     );
   });
 
+  test("GET caps limit at 100", async () => {
+    (prisma.conversion.findMany as unknown as jest.Mock).mockResolvedValue([]);
+    (prisma.conversion.count as unknown as jest.Mock).mockResolvedValue(0);
+
+    const req = new Request("http://localhost:3000/api/conversions?page=2&limit=999");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.conversion.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skip: 100, take: 100 })
+    );
+  });
+
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/conversions");
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.conversion.findMany).not.toHaveBeenCalled();
+  });
+
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.conversion.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/conversions");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("POST rejects same from/to asset", async () => {
     const req = new Request("http://localhost:3000/api/conversions", {
       method: "POST",
@@ -68,6 +102,32 @@ describe("Conversions API", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ fromAsset: "ETH", toAsset: "USDC", fromAmount: "1.5", chainId: 421614 }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects missing required fields", async () => {
+    const req = new Request("http://localhost:3000/api/conversions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromAsset: "ETH" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects invalid chainId", async () => {
+    const req = new Request("http://localhost:3000/api/conversions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromAsset: "ETH", toAsset: "USDC", fromAmount: "100", chainId: "bad" }),
     });
 
     const res = await POST(req);
@@ -178,5 +238,36 @@ describe("Conversions API", () => {
       })
     );
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("POST passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Forbidden" }, { status: 403 })
+    );
+
+    const req = new Request("http://localhost:3000/api/conversions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromAsset: "ETH", toAsset: "USDC", fromAmount: "100", chainId: 421614 }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(403);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST returns 500 on unexpected errors", async () => {
+    global.fetch = jest.fn().mockRejectedValue(new Error("network down"));
+
+    const req = new Request("http://localhost:3000/api/conversions", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fromAsset: "ETH", toAsset: "USDC", fromAmount: "100", chainId: 421614 }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
   });
 });
