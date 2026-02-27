@@ -59,6 +59,18 @@ describe("Admin 2FA API", () => {
     expect(res.status).toBe(400);
   });
 
+  test("returns 400 for malformed JSON body", async () => {
+    const req = new Request("http://localhost:3000/api/admin/2fa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{",
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(prisma.adminConfig.findUnique).not.toHaveBeenCalled();
+  });
+
   test("status returns enabled false when no secret exists", async () => {
     (prisma.adminConfig.findUnique as unknown as jest.Mock).mockResolvedValue(null);
 

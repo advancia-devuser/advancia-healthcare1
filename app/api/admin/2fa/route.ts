@@ -23,14 +23,14 @@ function isSixDigitCode(value: unknown): value is string {
   return typeof value === "string" && /^\d{6}$/.test(value);
 }
 
-export async function POST(request: Request) {
+export async function POST(request: Request): Promise<Response> {
   const isAdmin = await isAdminRequest();
   if (!isAdmin) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    const body: unknown = await request.json();
+    const body: unknown = await request.json().catch(() => null);
     if (!body || typeof body !== "object") {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
@@ -162,6 +162,11 @@ export async function POST(request: Request) {
 
       return NextResponse.json({ enabled: false, message: "Admin 2FA has been disabled." });
     }
+
+    return NextResponse.json(
+      { error: "Invalid action. Use setup, verify, disable, or status." },
+      { status: 400 }
+    );
   } catch (e) {
     console.error("Admin 2FA error:", e);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
