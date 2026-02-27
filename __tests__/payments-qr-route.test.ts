@@ -56,6 +56,36 @@ describe("Payments QR API", () => {
     expect(prisma.wallet.findUnique).not.toHaveBeenCalled();
   });
 
+  test("GET returns 404 when wallet is missing", async () => {
+    (prisma.wallet.findUnique as unknown as jest.Mock).mockResolvedValue(null);
+
+    const req = new Request("http://localhost:3000/api/payments/qr?amount=10&asset=ETH");
+    const res = await GET(req);
+
+    expect(res.status).toBe(404);
+  });
+
+  test("GET passes through thrown Response errors", async () => {
+    (requireApprovedUser as unknown as jest.Mock).mockRejectedValue(
+      Response.json({ error: "Unauthorized" }, { status: 401 })
+    );
+
+    const req = new Request("http://localhost:3000/api/payments/qr");
+    const res = await GET(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.wallet.findUnique).not.toHaveBeenCalled();
+  });
+
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.wallet.findUnique as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/payments/qr?amount=10");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
   test("POST rejects non-boolean confirm", async () => {
     const req = new Request("http://localhost:3000/api/payments/qr", {
       method: "POST",
@@ -69,6 +99,36 @@ describe("Payments QR API", () => {
     const res = await POST(req);
 
     expect(res.status).toBe(400);
+  });
+
+  test("POST rejects missing qrData", async () => {
+    const req = new Request("http://localhost:3000/api/payments/qr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ confirm: false }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.paymentRequest.findUnique).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects non-string pin", async () => {
+    const req = new Request("http://localhost:3000/api/payments/qr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        qrData: JSON.stringify({ type: "smartwallet-pay", recipient: "0xdef", amount: "10" }),
+        confirm: true,
+        pin: 1234,
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.paymentRequest.findUnique).not.toHaveBeenCalled();
   });
 
   test("POST returns 400 for malformed JSON body", async () => {
@@ -122,6 +182,84 @@ describe("Payments QR API", () => {
     expect(body.amount).toBe("100");
     expect(body.asset).toBe("ETH");
     expect(body.requestId).toBe("req-1");
+  });
+
+  test("POST confirm mode rejects QR payload without fixed amount", async () => {
+    const req = new Request("http://localhost:3000/api/payments/qr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        qrData: JSON.stringify({ type: "smartwallet-pay", recipient: "0xdef" }),
+        confirm: true,
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(transferInternal).not.toHaveBeenCalled();
+  });
+
+  test("POST confirm mode returns 409 when request already paid", async () => {
+    (prisma.paymentRequest.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "p1",
+      status: "PAID",
+      expiresAt: null,
+    });
+
+    const req = new Request("http://localhost:3000/api/payments/qr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        qrData: JSON.stringify({ type: "smartwallet-pay", recipient: "0xdef", amount: "10", requestId: "req-1" }),
+        confirm: true,
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(409);
+    expect(transferInternal).not.toHaveBeenCalled();
+  });
+
+  test("POST confirm mode returns 400 when recipient has no wallet", async () => {
+    (prisma.paymentRequest.findUnique as unknown as jest.Mock).mockResolvedValue(null);
+    (prisma.user.findUnique as unknown as jest.Mock).mockResolvedValue({ id: "u2", address: "0xdef" });
+    (prisma.wallet.findUnique as unknown as jest.Mock).mockResolvedValue(null);
+
+    const req = new Request("http://localhost:3000/api/payments/qr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        qrData: JSON.stringify({ type: "smartwallet-pay", recipient: "0xdef", amount: "10" }),
+        confirm: true,
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(transferInternal).not.toHaveBeenCalled();
+  });
+
+  test("POST confirm mode maps insufficient balance errors to 400", async () => {
+    (prisma.paymentRequest.findUnique as unknown as jest.Mock).mockResolvedValue(null);
+    (prisma.user.findUnique as unknown as jest.Mock).mockResolvedValue({ id: "u2", address: "0xdef" });
+    (prisma.wallet.findUnique as unknown as jest.Mock).mockResolvedValue({ userId: "u2" });
+    (transferInternal as unknown as jest.Mock).mockRejectedValue(new Error("Insufficient balance"));
+
+    const req = new Request("http://localhost:3000/api/payments/qr", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        qrData: JSON.stringify({ type: "smartwallet-pay", recipient: "0xdef", amount: "10" }),
+        confirm: true,
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
   });
 
   test("POST confirm mode returns 404 when recipient is missing", async () => {
