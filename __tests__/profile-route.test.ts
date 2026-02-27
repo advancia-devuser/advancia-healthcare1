@@ -112,6 +112,19 @@ describe("Profile API", () => {
     );
   });
 
+  test("GET uses default wallet balance when ETH balance is missing", async () => {
+    (prisma.walletBalance.findMany as unknown as jest.Mock).mockResolvedValue([
+      { asset: "USDC", balance: "25", updatedAt: new Date("2026-01-01T00:00:00.000Z") },
+    ]);
+
+    const req = new Request("http://localhost:3000/api/profile");
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.wallet.balance).toBe("0");
+  });
+
   test("PATCH returns 400 for malformed JSON body", async () => {
     const req = new Request("http://localhost:3000/api/profile", {
       method: "PATCH",
@@ -240,5 +253,37 @@ describe("Profile API", () => {
       })
     );
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("PATCH updates a single field and records audit metadata", async () => {
+    (prisma.user.update as unknown as jest.Mock).mockResolvedValue({
+      ...authedUser,
+      name: "Bob",
+    });
+
+    const req = new Request("http://localhost:3000/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: "  Bob  " }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.user.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "u1" },
+        data: { name: "Bob" },
+      })
+    );
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: "u1",
+          action: "PROFILE_UPDATE",
+          meta: JSON.stringify({ fields: ["name"] }),
+        }),
+      })
+    );
   });
 });
