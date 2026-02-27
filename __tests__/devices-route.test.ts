@@ -51,6 +51,43 @@ describe("Devices API", () => {
     );
   });
 
+  test("GET returns 500 on unexpected errors", async () => {
+    (prisma.device.findMany as unknown as jest.Mock).mockRejectedValue(new Error("db down"));
+
+    const req = new Request("http://localhost:3000/api/devices");
+    const res = await GET(req);
+
+    expect(res.status).toBe(500);
+  });
+
+  test("POST returns 401 when unauthorized", async () => {
+    (getAuthUser as unknown as jest.Mock).mockResolvedValue(null);
+
+    const req = new Request("http://localhost:3000/api/devices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceName: "iPhone", deviceType: "mobile", fingerprint: "fp-12345678" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.device.upsert).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects missing required fields", async () => {
+    const req = new Request("http://localhost:3000/api/devices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceName: "iPhone" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.device.upsert).not.toHaveBeenCalled();
+  });
+
   test("POST rejects invalid fingerprint", async () => {
     const req = new Request("http://localhost:3000/api/devices", {
       method: "POST",
@@ -116,6 +153,35 @@ describe("Devices API", () => {
     );
   });
 
+  test("POST returns 500 on unexpected errors", async () => {
+    (prisma.device.upsert as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/devices", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceName: "iPhone", deviceType: "mobile", fingerprint: "fp-12345678" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+  });
+
+  test("DELETE returns 401 when unauthorized", async () => {
+    (getAuthUser as unknown as jest.Mock).mockResolvedValue(null);
+
+    const req = new Request("http://localhost:3000/api/devices", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId: "d1" }),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(401);
+    expect(prisma.device.updateMany).not.toHaveBeenCalled();
+  });
+
   test("DELETE rejects missing deviceId", async () => {
     const req = new Request("http://localhost:3000/api/devices", {
       method: "DELETE",
@@ -161,5 +227,19 @@ describe("Devices API", () => {
     expect(prisma.auditLog.create).toHaveBeenCalledWith(
       expect.objectContaining({ data: expect.objectContaining({ action: "DEVICE_REVOKED" }) })
     );
+  });
+
+  test("DELETE returns 500 on unexpected errors", async () => {
+    (prisma.device.updateMany as unknown as jest.Mock).mockRejectedValue(new Error("db failure"));
+
+    const req = new Request("http://localhost:3000/api/devices", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId: "d1" }),
+    });
+
+    const res = await DELETE(req);
+
+    expect(res.status).toBe(500);
   });
 });
