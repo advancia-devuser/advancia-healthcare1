@@ -91,6 +91,21 @@ describe("Health Cards API", () => {
         })
       );
     });
+
+    it("should return 400 for invalid status filter", async () => {
+      const { req } = createMocks({
+        method: "GET",
+        url: "http://localhost:3000/api/health/cards?status=BAD",
+        headers: {
+          authorization: `Bearer ${validToken}`,
+        },
+      });
+
+      const response = await GET(req as any);
+
+      expect(response.status).toBe(400);
+      expect(prisma.healthCard.findMany).not.toHaveBeenCalled();
+    });
   });
 
   describe("POST /api/health/cards", () => {
@@ -133,6 +148,78 @@ describe("Health Cards API", () => {
           }),
         })
       );
+    });
+
+    it("should return 400 when required fields are missing", async () => {
+      const payload = {
+        providerName: "Aetna",
+      };
+
+      const { req } = createMocks({
+        method: "POST",
+        url: "http://localhost:3000/api/health/cards",
+        headers: {
+          authorization: `Bearer ${validToken}`,
+        },
+        body: payload,
+      });
+
+      (req as any).json = jest.fn().mockResolvedValue(payload);
+
+      const response = await POST(req as any);
+
+      expect(response.status).toBe(400);
+      expect(prisma.healthCard.create).not.toHaveBeenCalled();
+    });
+
+    it("should return 400 for invalid expiresAt", async () => {
+      const payload = {
+        providerName: "Aetna",
+        cardType: "INSURANCE",
+        cardData: { policyNumber: "98765" },
+        expiresAt: "not-a-date",
+      };
+
+      const { req } = createMocks({
+        method: "POST",
+        url: "http://localhost:3000/api/health/cards",
+        headers: {
+          authorization: `Bearer ${validToken}`,
+        },
+        body: payload,
+      });
+
+      (req as any).json = jest.fn().mockResolvedValue(payload);
+
+      const response = await POST(req as any);
+
+      expect(response.status).toBe(400);
+      expect(prisma.healthCard.create).not.toHaveBeenCalled();
+    });
+
+    it("should return 500 on unexpected database errors", async () => {
+      const payload = {
+        providerName: "Aetna",
+        cardType: "INSURANCE",
+        cardData: { policyNumber: "98765" },
+      };
+
+      (prisma.healthCard.create as jest.Mock).mockRejectedValue(new Error("db down"));
+
+      const { req } = createMocks({
+        method: "POST",
+        url: "http://localhost:3000/api/health/cards",
+        headers: {
+          authorization: `Bearer ${validToken}`,
+        },
+        body: payload,
+      });
+
+      (req as any).json = jest.fn().mockResolvedValue(payload);
+
+      const response = await POST(req as any);
+
+      expect(response.status).toBe(500);
     });
   });
 });
