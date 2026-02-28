@@ -109,6 +109,32 @@ describe("Admin Ledger API", () => {
     expect(creditWallet).not.toHaveBeenCalled();
   });
 
+  test("POST rejects empty idempotencyKey", async () => {
+    const req = new Request("http://localhost:3000/api/admin/ledger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "u1", amount: "10", idempotencyKey: "   " }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(creditWallet).not.toHaveBeenCalled();
+  });
+
+  test("POST rejects empty note", async () => {
+    const req = new Request("http://localhost:3000/api/admin/ledger", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "u1", amount: "10", note: "   " }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(creditWallet).not.toHaveBeenCalled();
+  });
+
   test("POST returns 404 when user is missing", async () => {
     (prisma.user.findUnique as unknown as jest.Mock).mockResolvedValue(null);
 
@@ -251,6 +277,19 @@ describe("Admin Ledger API", () => {
     expect(debitWallet).not.toHaveBeenCalled();
   });
 
+  test("PATCH rejects invalid chainId", async () => {
+    const req = new Request("http://localhost:3000/api/admin/ledger", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "u1", amount: "10", chainId: 0 }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(debitWallet).not.toHaveBeenCalled();
+  });
+
   test("PATCH maps duplicate txHash to 409", async () => {
     (prisma.user.findUnique as unknown as jest.Mock).mockResolvedValue({
       id: "u1",
@@ -297,5 +336,26 @@ describe("Admin Ledger API", () => {
     expect(res.status).toBe(200);
     expect(debitWallet).toHaveBeenCalledTimes(1);
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("PATCH returns 500 on unexpected errors", async () => {
+    (prisma.user.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "u1",
+      status: "APPROVED",
+      address: "0xabc",
+    });
+
+    (debitWallet as unknown as jest.Mock).mockRejectedValue(new Error("Unexpected ledger failure"));
+
+    const req = new Request("http://localhost:3000/api/admin/ledger", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: "u1", amount: "10", type: "SEND" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(500);
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
   });
 });
