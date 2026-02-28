@@ -255,6 +255,32 @@ describe("Admin Wallet API", () => {
     expect(prisma.adminWallet.findFirst).not.toHaveBeenCalled();
   });
 
+  test("PATCH rejects missing asset", async () => {
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount: "10" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.adminWallet.findFirst).not.toHaveBeenCalled();
+  });
+
+  test("PATCH rejects invalid amount format", async () => {
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asset: "ETH", amount: "10.5" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.adminWallet.findFirst).not.toHaveBeenCalled();
+  });
+
   test("PATCH returns 403 when not admin", async () => {
     (isAdminRequest as unknown as jest.Mock).mockResolvedValue(false);
 
