@@ -122,6 +122,8 @@ describe("Admin Login API", () => {
   });
 
   test("POST returns 401 when password is missing", async () => {
+    (registerAdminFailure as unknown as jest.Mock).mockResolvedValue({ lockMs: 5000 });
+
     const req = new Request("http://localhost:3000/api/admin/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -131,7 +133,25 @@ describe("Admin Login API", () => {
     const res = await POST(req);
 
     expect(res.status).toBe(401);
+    expect(res.headers.get("Retry-After")).toBe("5");
     expect(registerAdminFailure).toHaveBeenCalledTimes(1);
+  });
+
+  test("POST returns 500 when admin password env is missing", async () => {
+    delete process.env.ADMIN_PASSWORD_HASH;
+    delete process.env.ADMIN_PASSWORD;
+
+    const req = new Request("http://localhost:3000/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "pass" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Server misconfiguration");
   });
 
   test("POST returns 401 when password is incorrect", async () => {
@@ -238,6 +258,22 @@ describe("Admin Login API", () => {
     expect(res.status).toBe(401);
     expect(registerAdminFailure).toHaveBeenCalledTimes(1);
     expect(signAdminToken).not.toHaveBeenCalled();
+  });
+
+  test("POST returns 500 on unexpected errors", async () => {
+    (signAdminToken as unknown as jest.Mock).mockRejectedValue(new Error("token signing failed"));
+
+    const req = new Request("http://localhost:3000/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "pass" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(500);
+    const body = await res.json();
+    expect(body.error).toBe("Internal error");
   });
 
   test("DELETE clears admin_session cookie", async () => {
