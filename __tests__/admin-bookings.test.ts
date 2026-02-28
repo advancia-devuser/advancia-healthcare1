@@ -310,4 +310,51 @@ describe("Admin Bookings API", () => {
     expect(prisma.notification.create).not.toHaveBeenCalled();
     expect(prisma.auditLog.create).not.toHaveBeenCalled();
   });
+
+  test("PATCH returns 500 when notification write fails", async () => {
+    (prisma.booking.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "b5",
+      userId: "u1",
+      chamberName: "Heart Clinic",
+      date: "2026-03-05",
+      timeSlot: "14:00",
+    });
+    (prisma.booking.update as unknown as jest.Mock).mockResolvedValue({ id: "b5", status: "CONFIRMED" });
+    (prisma.notification.create as unknown as jest.Mock).mockRejectedValue(new Error("notification down"));
+
+    const req = new Request("http://localhost:3000/api/admin/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "b5", action: "CONFIRM" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(500);
+    expect(prisma.auditLog.create).not.toHaveBeenCalled();
+  });
+
+  test("PATCH returns 500 when audit log write fails", async () => {
+    (prisma.booking.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "b6",
+      userId: "u1",
+      chamberName: "Heart Clinic",
+      date: "2026-03-06",
+      timeSlot: "15:00",
+    });
+    (prisma.booking.update as unknown as jest.Mock).mockResolvedValue({ id: "b6", status: "CONFIRMED" });
+    (prisma.notification.create as unknown as jest.Mock).mockResolvedValue({});
+    (prisma.auditLog.create as unknown as jest.Mock).mockRejectedValue(new Error("audit down"));
+
+    const req = new Request("http://localhost:3000/api/admin/bookings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId: "b6", action: "CONFIRM" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(500);
+    expect(prisma.notification.create).toHaveBeenCalledTimes(1);
+  });
 });
