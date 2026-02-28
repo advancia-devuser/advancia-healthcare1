@@ -103,6 +103,22 @@ describe("Admin 2FA API", () => {
     expect(body.enabled).toBe(true);
   });
 
+  test("normalizes action casing/whitespace for status", async () => {
+    (prisma.adminConfig.findUnique as unknown as jest.Mock).mockResolvedValue(null);
+
+    const req = new Request("http://localhost:3000/api/admin/2fa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "  STATUS  " }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    const body = await res.json();
+    expect(body.enabled).toBe(false);
+  });
+
   test("verify rejects non-numeric 6-digit code", async () => {
     const req = new Request("http://localhost:3000/api/admin/2fa", {
       method: "POST",
@@ -212,6 +228,38 @@ describe("Admin 2FA API", () => {
 
     const res = await POST(req);
     expect(res.status).toBe(400);
+  });
+
+  test("disable rejects non-6-digit code", async () => {
+    const req = new Request("http://localhost:3000/api/admin/2fa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "disable", code: "12AB56" }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(400);
+    expect(prisma.adminConfig.findUnique).not.toHaveBeenCalled();
+  });
+
+  test("verify accepts normalized action and enables 2FA", async () => {
+    (prisma.adminConfig.findUnique as unknown as jest.Mock).mockResolvedValue({ value: "PENDINGSECRET" });
+    (verifyTotpCode as unknown as jest.Mock).mockReturnValue(true);
+    (encrypt as unknown as jest.Mock).mockReturnValue("ENCRYPTED");
+    (prisma.adminConfig.upsert as unknown as jest.Mock).mockResolvedValue({});
+    (prisma.adminConfig.delete as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/2fa", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "  VERIFY  ", code: "123456" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.adminConfig.upsert).toHaveBeenCalledTimes(1);
+    expect(prisma.adminConfig.delete).toHaveBeenCalledTimes(1);
   });
 
   test("disable validates code and deletes enabled secret", async () => {
