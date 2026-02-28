@@ -349,6 +349,44 @@ describe("Admin Withdrawals API", () => {
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
   });
 
+  test("PATCH still succeeds when notification send calls fail", async () => {
+    (txMock.withdrawal.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "w4",
+      userId: "u1",
+      status: "PENDING",
+      amount: "4.0",
+      asset: "ETH",
+      chainId: 1,
+      toAddress: "0xbbb",
+      user: { email: "u1@test.com", phone: "+12345678901", address: "0x1" },
+    });
+
+    (debitWallet as unknown as jest.Mock).mockResolvedValue({ transactionId: "tx4" });
+
+    (txMock.withdrawal.update as unknown as jest.Mock).mockResolvedValue({
+      id: "w4",
+      userId: "u1",
+      amount: "4.0",
+      asset: "ETH",
+      user: { email: "u1@test.com", phone: "+12345678901" },
+    });
+
+    (sendWithdrawalEmail as unknown as jest.Mock).mockRejectedValue(new Error("email down"));
+    (sendWithdrawalSms as unknown as jest.Mock).mockRejectedValue(new Error("sms down"));
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/withdrawals", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ withdrawalId: "w4", action: "APPROVE" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
   test("PATCH maps insufficient balance errors to 400", async () => {
     (txMock.withdrawal.findUnique as unknown as jest.Mock).mockResolvedValue({
       id: "w1",
