@@ -167,6 +167,84 @@ describe("Admin Cards API", () => {
     );
   });
 
+  test("PATCH trims cardId before update", async () => {
+    (prisma.cardRequest.update as unknown as jest.Mock).mockResolvedValue({
+      id: "card-trim",
+      userId: "user-1",
+      status: "REJECTED",
+      last4: null,
+    });
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/cards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: "  card-trim  ", action: "REJECT" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.cardRequest.update).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { id: "card-trim" } })
+    );
+  });
+
+  test("PATCH approves card without last4 and stores null", async () => {
+    (prisma.cardRequest.update as unknown as jest.Mock).mockResolvedValue({
+      id: "card-2",
+      userId: "user-2",
+      status: "APPROVED",
+      last4: null,
+    });
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/cards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: "card-2", action: "APPROVE" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.cardRequest.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "APPROVED", last4: null }),
+      })
+    );
+  });
+
+  test("PATCH rejects card and writes audit log", async () => {
+    (prisma.cardRequest.update as unknown as jest.Mock).mockResolvedValue({
+      id: "card-3",
+      userId: "user-3",
+      status: "REJECTED",
+      last4: "9999",
+    });
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/cards", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ cardId: "card-3", action: "REJECT" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.cardRequest.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "REJECTED" }),
+      })
+    );
+    expect(prisma.auditLog.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ action: "CARD_REJECT" }),
+      })
+    );
+  });
+
   test("PATCH returns 404 when card request does not exist", async () => {
     const notFoundError = new Prisma.PrismaClientKnownRequestError(
       "Record to update not found.",
