@@ -92,6 +92,30 @@ describe("Admin Payment Requests API", () => {
     expect(res.status).toBe(500);
   });
 
+  test("GET returns summary counts and computed pages", async () => {
+    (prisma.paymentRequest.findMany as unknown as jest.Mock).mockResolvedValue([
+      { id: "p1", status: "PENDING" },
+      { id: "p2", status: "PAID" },
+    ]);
+    (prisma.paymentRequest.count as unknown as jest.Mock).mockResolvedValue(45);
+    (prisma.paymentRequest.groupBy as unknown as jest.Mock).mockResolvedValue([
+      { status: "PENDING", _count: { _all: 20 } },
+      { status: "PAID", _count: { _all: 15 } },
+      { status: "EXPIRED", _count: { _all: 10 } },
+    ]);
+
+    const req = new Request("http://localhost:3000/api/admin/payment-requests?page=2&limit=10");
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.total).toBe(45);
+    expect(body.page).toBe(2);
+    expect(body.limit).toBe(10);
+    expect(body.pages).toBe(5);
+    expect(body.summary).toEqual({ PENDING: 20, PAID: 15, EXPIRED: 10 });
+  });
+
   test("PATCH rejects invalid action", async () => {
     const req = new Request("http://localhost:3000/api/admin/payment-requests", {
       method: "PATCH",
@@ -208,6 +232,68 @@ describe("Admin Payment Requests API", () => {
       expect.objectContaining({
         where: { id: "p1" },
         data: { status: "CANCELLED" },
+      })
+    );
+    expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
+  });
+
+  test("PATCH trims requestId before lookup", async () => {
+    (prisma.paymentRequest.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "p-trim",
+      requestId: "req-trim",
+      status: "PENDING",
+    });
+
+    (prisma.paymentRequest.update as unknown as jest.Mock).mockResolvedValue({
+      id: "p-trim",
+      requestId: "req-trim",
+      status: "CANCELLED",
+    });
+
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/payment-requests", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId: "  req-trim  ", action: "CANCEL" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.paymentRequest.findUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { requestId: "req-trim" } })
+    );
+  });
+
+  test("PATCH expires pending request and writes audit log", async () => {
+    (prisma.paymentRequest.findUnique as unknown as jest.Mock).mockResolvedValue({
+      id: "p2",
+      requestId: "req-2",
+      status: "PENDING",
+    });
+
+    (prisma.paymentRequest.update as unknown as jest.Mock).mockResolvedValue({
+      id: "p2",
+      requestId: "req-2",
+      status: "EXPIRED",
+    });
+
+    (prisma.auditLog.create as unknown as jest.Mock).mockResolvedValue({});
+
+    const req = new Request("http://localhost:3000/api/admin/payment-requests", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ requestId: "req-2", action: "EXPIRE" }),
+    });
+
+    const res = await PATCH(req);
+
+    expect(res.status).toBe(200);
+    expect(prisma.paymentRequest.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "p2" },
+        data: { status: "EXPIRED" },
       })
     );
     expect(prisma.auditLog.create).toHaveBeenCalledTimes(1);
