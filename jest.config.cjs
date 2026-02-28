@@ -18,4 +18,22 @@ module.exports = {
   transformIgnorePatterns: [
     "node_modules/(?!(viem|@noble|@scure)/)",
   ],
+
+  // ── Coverage ──
+  collectCoverageFrom: [
+    "app/api/**/*.ts",
+    "lib/**/*.ts",
+    "!lib/shims/**",
+    "!**/*.d.ts",
+  ],
+  coverageDirectory: "coverage",
+  coverageReporters: ["text", "text-summary", "lcov"],
+  coverageThreshold: {
+    global: {
+      branches: 50,
+      functions: 60,
+      lines: 60,
+      statements: 60,
+    },
+  },
 };

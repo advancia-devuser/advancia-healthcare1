@@ -6,6 +6,39 @@ on:
     branches: [main]
 
 jobs:
+  # ── Build & Lint ──
+  build-and-lint:
+    name: Build, Lint & Type-check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: TypeScript type-check
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_ALCHEMY_API_KEY: "ci-placeholder"
+          NEXT_PUBLIC_ALCHEMY_POLICY_ID: "ci-placeholder"
+
+  # ── Environment validation tests ──
   env-validation-tests:
     name: Env validation tests
     runs-on: ubuntu-latest
@@ -25,6 +58,7 @@ jobs:
       - name: Run env test group
         run: npx jest --config jest.config.cjs --runInBand __tests__/env.test.ts
 
+  # ── Unit / API tests ──
   unit-tests:
     name: Unit/API tests (excluding env group)
     runs-on: ubuntu-latest
@@ -41,5 +75,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run remaining tests
-        run: npx jest --config jest.config.cjs --runInBand --testPathIgnorePatterns=__tests__/env.test.ts
+      - name: Run remaining tests with coverage
+        run: npx jest --config jest.config.cjs --runInBand --coverage --testPathIgnorePatterns=__tests__/env.test.ts

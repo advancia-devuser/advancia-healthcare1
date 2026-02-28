@@ -34,6 +34,57 @@ const nextConfig = {
       },
     ],
   },
+
+  // ── Security Headers ──
+  // Applied on every response when deployed to Vercel (or any Node server).
+  // Mirrors the headers already set in infra/nginx.conf for Docker deploys.
+  async headers() {
+    return [
+      {
+        source: "/(.*)",
+        headers: [
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=63072000; includeSubDomains; preload",
+          },
+          {
+            key: "X-Frame-Options",
+            value: "DENY",
+          },
+          {
+            key: "X-Content-Type-Options",
+            value: "nosniff",
+          },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=(), payment=(self)",
+          },
+          {
+            key: "X-DNS-Prefetch-Control",
+            value: "on",
+          },
+          {
+            key: "Content-Security-Policy",
+            value: [
+              "default-src 'self'",
+              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.alchemyapi.io",
+              "style-src 'self' 'unsafe-inline'",
+              "img-src 'self' data: https://static.alchemyapi.io",
+              "font-src 'self'",
+              "connect-src 'self' https://*.alchemyapi.io https://*.alchemy.com https://api.resend.com",
+              "frame-ancestors 'none'",
+              "base-uri 'self'",
+              "form-action 'self'",
+            ].join("; "),
+          },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;

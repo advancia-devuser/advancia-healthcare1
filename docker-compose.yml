@@ -37,7 +37,7 @@ services:
       dockerfile: Dockerfile
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=file:./prisma/dev.db
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL env var (e.g. postgresql://user:pass@host:5432/db)}
       - ADMIN_JWT_SECRET=${ADMIN_JWT_SECRET:?Set ADMIN_JWT_SECRET env var}
       - USER_JWT_SECRET=${USER_JWT_SECRET:?Set USER_JWT_SECRET env var}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:?Set ADMIN_PASSWORD env var}
