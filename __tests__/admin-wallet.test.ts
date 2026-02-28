@@ -426,4 +426,130 @@ describe("Admin Wallet API", () => {
     expect(res.status).toBe(500);
     expect(prisma.adminTransaction.create).not.toHaveBeenCalled();
   });
+
+  test("GET revenue aggregation handles empty totals", async () => {
+    (prisma.adminWallet.findMany as unknown as jest.Mock).mockResolvedValue([]);
+    (prisma.adminTransaction.findMany as unknown as jest.Mock)
+      .mockResolvedValueOnce([]) // Transactions
+      .mockResolvedValueOnce([]); // Totals
+    (prisma.user.count as unknown as jest.Mock).mockResolvedValue(0);
+    (prisma.subscription.count as unknown as jest.Mock).mockResolvedValue(0);
+    (prisma.booking.count as unknown as jest.Mock).mockResolvedValue(0);
+
+    const res = await GET();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.revenue).toEqual({});
+  });
+
+  test("POST trims asset and label", async () => {
+    (prisma.adminWallet.findFirst as unknown as jest.Mock).mockResolvedValue(null);
+    (prisma.adminWallet.upsert as unknown as jest.Mock).mockResolvedValue({ id: "w1", balance: "0" });
+
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asset: "  USDC  ", label: "  Custom Label  " }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    expect(prisma.adminWallet.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { label_asset: { label: "Custom Label", asset: "USDC" } },
+      })
+    );
+  });
+
+  test("POST uses default label when label is empty string", async () => {
+    (prisma.adminWallet.findFirst as unknown as jest.Mock).mockResolvedValue(null);
+    (prisma.adminWallet.upsert as unknown as jest.Mock).mockResolvedValue({ id: "w1", balance: "0" });
+
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asset: "USDC", label: "   " }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+
+    expect(prisma.adminWallet.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({ label: "Platform Treasury" }),
+      })
+    );
+  });
+
+  test("POST handles null/undefined amount and address explicitly", async () => {
+    (prisma.adminWallet.findFirst as unknown as jest.Mock).mockResolvedValue(null);
+    (prisma.adminWallet.upsert as unknown as jest.Mock).mockResolvedValue({ id: "w1", balance: "0" });
+
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asset: "ETH", amount: null, address: null }),
+    });
+
+    const res = await POST(req);
+    expect(res.status).toBe(200);
+    expect(prisma.adminWallet.upsert).toHaveBeenCalled();
+  });
+
+  test("PATCH trims asset and reference", async () => {
+    (prisma.adminWallet.findFirst as unknown as jest.Mock).mockResolvedValue({
+      id: "w1",
+      balance: "100",
+      asset: "ETH",
+    });
+    (prisma.adminWallet.update as unknown as jest.Mock).mockResolvedValue({ id: "w1", balance: "90" });
+
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        asset: "  ETH  ",
+        amount: "10",
+        reference: "  REF123  ",
+      }),
+    });
+
+    const res = await PATCH(req);
+    expect(res.status).toBe(200);
+
+    expect(prisma.adminTransaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          asset: "ETH",
+          reference: "REF123",
+        }),
+      })
+    );
+  });
+
+  test("PATCH uses default description when description is null", async () => {
+    (prisma.adminWallet.findFirst as unknown as jest.Mock).mockResolvedValue({
+      id: "w1",
+      balance: "100",
+      asset: "ETH",
+    });
+    (prisma.adminWallet.update as unknown as jest.Mock).mockResolvedValue({ id: "w1", balance: "90" });
+
+    const req = new Request("http://localhost:3000/api/admin/wallet", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ asset: "ETH", amount: "10", description: null }),
+    });
+
+    const res = await PATCH(req);
+    expect(res.status).toBe(200);
+
+    expect(prisma.adminTransaction.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ description: "Admin withdrawal" }),
+      })
+    );
+  });
 });
