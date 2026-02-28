@@ -170,6 +170,24 @@ describe("Admin Login API", () => {
     expect(signAdminToken).not.toHaveBeenCalled();
   });
 
+  test("POST authenticates via plaintext fallback in non-production", async () => {
+    delete process.env.ADMIN_PASSWORD_HASH;
+    process.env.ADMIN_PASSWORD = "plain-pass";
+    process.env.NODE_ENV = "test";
+
+    const req = new Request("http://localhost:3000/api/admin/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ password: "plain-pass" }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(200);
+    expect(compare).not.toHaveBeenCalled();
+    expect(signAdminToken).toHaveBeenCalledTimes(1);
+  });
+
   test("POST requires 2FA code when enabled", async () => {
     (prisma.adminConfig.findUnique as unknown as jest.Mock).mockResolvedValue({ value: "encrypted" });
 
@@ -246,6 +264,7 @@ describe("Admin Login API", () => {
     (prisma.adminConfig.findUnique as unknown as jest.Mock).mockResolvedValue({ value: "encrypted" });
     (decrypt as unknown as jest.Mock).mockReturnValue("secret");
     (verifyTotpCode as unknown as jest.Mock).mockReturnValue(false);
+    (registerAdminFailure as unknown as jest.Mock).mockResolvedValue({ lockMs: 4000 });
 
     const req = new Request("http://localhost:3000/api/admin/login", {
       method: "POST",
@@ -256,6 +275,7 @@ describe("Admin Login API", () => {
     const res = await POST(req);
 
     expect(res.status).toBe(401);
+    expect(res.headers.get("Retry-After")).toBe("4");
     expect(registerAdminFailure).toHaveBeenCalledTimes(1);
     expect(signAdminToken).not.toHaveBeenCalled();
   });
