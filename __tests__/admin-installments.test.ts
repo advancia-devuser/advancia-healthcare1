@@ -146,6 +146,26 @@ describe("Admin Installments API", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  test("POST rejects invalid decimal values", async () => {
+    const req = new Request("http://localhost:3000/api/admin/installments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: "u1",
+        totalAmount: "bad-decimal",
+        interestRate: "10",
+        installmentCount: 3,
+        frequency: "MONTHLY",
+        startDate: "2026-02-01T00:00:00.000Z",
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   test("POST rejects negative interestRate", async () => {
     const req = new Request("http://localhost:3000/api/admin/installments", {
       method: "POST",
@@ -207,6 +227,26 @@ describe("Admin Installments API", () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  test("POST rejects invalid installmentCount", async () => {
+    const req = new Request("http://localhost:3000/api/admin/installments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: "u1",
+        totalAmount: "100",
+        interestRate: "10",
+        installmentCount: "not-a-number",
+        frequency: "MONTHLY",
+        startDate: "2026-02-01T00:00:00.000Z",
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   test("POST returns 400 for malformed JSON body", async () => {
     const req = new Request("http://localhost:3000/api/admin/installments", {
       method: "POST",
@@ -231,6 +271,25 @@ describe("Admin Installments API", () => {
         installmentCount: 3,
         frequency: "MONTHLY",
         startDate: "not-a-date",
+      }),
+    });
+
+    const res = await POST(req);
+
+    expect(res.status).toBe(400);
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  test("POST requires startDate string", async () => {
+    const req = new Request("http://localhost:3000/api/admin/installments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        userId: "u1",
+        totalAmount: "100",
+        interestRate: "10",
+        installmentCount: 3,
+        frequency: "MONTHLY",
       }),
     });
 
