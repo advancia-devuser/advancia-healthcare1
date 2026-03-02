@@ -3,53 +3,7 @@ import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { transferInternal } from "@/lib/ledger";
 import { verifyUserPin } from "@/lib/pin-verify";
-
-function parsePositiveInt(value: string | null, fallback: number): number {
-  const parsed = Number.parseInt(value || "", 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback;
-  }
-  return parsed;
-}
-
-function normalizeNonEmptyString(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-function parsePositiveIntString(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-
-  const trimmed = value.trim();
-  if (!/^\d+$/.test(trimmed)) {
-    return null;
-  }
-
-  try {
-    const parsed = BigInt(trimmed);
-    return parsed > BigInt(0) ? parsed.toString() : null;
-  } catch {
-    return null;
-  }
-}
-
-function parseChainId(value: unknown, fallback: number): number | null {
-  if (value === undefined || value === null) {
-    return fallback;
-  }
-
-  const parsed = typeof value === "number" ? Math.trunc(value) : Number.parseInt(String(value), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return null;
-  }
-
-  return parsed;
-}
+import { parsePositiveInt, normalizeNonEmptyString, parsePositiveIntString, parseChainId } from "@/lib/validators";
 
 /**
  * GET /api/transfers?page=1&limit=20
@@ -235,9 +189,7 @@ export async function POST(request: Request) {
     if (err instanceof Error && err.message.includes("Insufficient balance")) {
       return NextResponse.json({ error: err.message }, { status: 400 });
     }
-    if (err instanceof Error) {
-      return NextResponse.json({ error: err.message || "Server error" }, { status: 500 });
-    }
+    // Never expose raw internal error messages to the client
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

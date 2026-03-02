@@ -1,4 +1,5 @@
 import { PrismaClient } from "@prisma/client";
+import { logger } from "@/lib/logger";
 
 function assertDatabaseUrlIsSsl(url: string | undefined) {
   if (!url) return;
@@ -28,7 +29,7 @@ function assertDatabaseUrlIsSsl(url: string | undefined) {
       throw new Error(msg);
     }
     // Dev safety warning
-    console.warn("⚠️ " + msg);
+    logger.warn(msg);
   }
 }
 

@@ -1,14 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-
-function normalizeNonEmptyString(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
+import { normalizeNonEmptyString, parseOptionalDate } from "@/lib/validators";
 
 function normalizeBigIntString(value: unknown): string | null {
   if (value === undefined || value === null) {
@@ -21,19 +14,6 @@ function normalizeBigIntString(value: unknown): string | null {
   }
 
   return raw;
-}
-
-function parseOptionalDate(value: unknown): Date | null {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
-
-  const parsed = new Date(String(value));
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  return parsed;
 }
 
 /**

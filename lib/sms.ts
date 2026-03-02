@@ -20,6 +20,8 @@
 
 /* ─── Types ─── */
 
+import { logger } from "@/lib/logger";
+
 export interface SendSmsOptions {
   to: string;
   body: string;
@@ -66,14 +68,14 @@ async function sendViaBrevo(to: string, body: string): Promise<SmsResult> {
 
     if (!res.ok) {
       const err = await res.text();
-      console.error(`[Brevo SMS ERROR] ${res.status}: ${err}`);
+      logger.error("Brevo SMS error", { status: res.status, err });
       return { success: false, provider: "brevo", error: err };
     }
 
     const data = await res.json();
     return { success: true, provider: "brevo", sid: data.messageId || data.reference };
   } catch (err: any) {
-    console.error("[Brevo SMS ERROR]", err.message);
+    logger.error("Brevo SMS error", { err: err.message });
     return { success: false, provider: "brevo", error: err.message };
   }
 }
@@ -104,14 +106,14 @@ async function sendViaTwilio(to: string, body: string): Promise<SmsResult> {
 
     if (!res.ok) {
       const err = await res.text();
-      console.error(`[Twilio SMS ERROR] ${res.status}: ${err}`);
+      logger.error("Twilio SMS error", { status: res.status, err });
       return { success: false, provider: "twilio", error: err };
     }
 
     const data = await res.json();
     return { success: true, provider: "twilio", sid: data.sid };
   } catch (err: any) {
-    console.error("[Twilio SMS ERROR]", err.message);
+    logger.error("Twilio SMS error", { err: err.message });
     return { success: false, provider: "twilio", error: err.message };
   }
 }
@@ -134,7 +136,7 @@ async function sendViaTextbelt(to: string, body: string): Promise<SmsResult> {
     }
     return { success: false, provider: "textbelt", error: data.error || "Textbelt send failed" };
   } catch (err: any) {
-    console.error("[Textbelt SMS ERROR]", err.message);
+    logger.error("Textbelt SMS error", { err: err.message });
     return { success: false, provider: "textbelt", error: err.message };
   }
 }
@@ -165,14 +167,20 @@ export async function sendSms(options: SendSmsOptions): Promise<SmsResult> {
     if (!p.available) continue;
     const result = await p.fn();
     if (result.success) {
-      console.log(`[SMS] Delivered via ${p.name} to ${to.slice(0, 5)}***`);
+      if (process.env.NODE_ENV !== 'production') {
+        logger.debug("SMS delivered", { provider: p.name, to: to.slice(0, 5) + "***" });
+      }
       return result;
     }
-    console.warn(`[SMS] ${p.name} failed: ${result.error} — trying next...`);
+    if (process.env.NODE_ENV !== 'production') {
+      logger.debug("SMS provider failed, trying next", { provider: p.name, error: result.error });
+    }
   }
 
   // All providers failed — dev mode fallback
-  console.log(`\n📱 [SMS — DEV MODE]\n  To: ${to}\n  Body: ${body}\n`);
+  if (process.env.NODE_ENV !== 'production') {
+    logger.debug("SMS sent in dev mode", { to });
+  }
   return { success: true, provider: "dev-console", sid: `dev-sms-${Date.now()}` };
 }
 

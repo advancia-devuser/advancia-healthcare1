@@ -15,6 +15,7 @@
 
 import { prisma } from "@/lib/db";
 import { sendSms } from "@/lib/sms";
+import { logger } from "@/lib/logger";
 
 /* ─── Config ─── */
 
@@ -80,14 +81,14 @@ async function sendViaSmsPool(phone: string, body: string): Promise<boolean> {
     });
 
     if (!res.ok) {
-      console.error("[SMS Pool ERROR]", await res.text());
+      logger.error("SMS Pool error", { err: await res.text() });
       return false;
     }
 
     const data = await res.json();
     return data.success === 1 || data.success === true;
   } catch (err: any) {
-    console.error("[SMS Pool ERROR]", err.message);
+    logger.error("SMS Pool error", { err: err.message });
     return false;
   }
 }
@@ -149,7 +150,9 @@ export async function sendOtp(
   }
 
   // Dev mode: Twilio returns success in dev mode already, but just in case
-  console.log(`\n📱 [OTP DEV] Phone: ${phone} | Code: ${code} | Expires: ${expiresAt.toISOString()}\n`);
+  if (process.env.NODE_ENV !== 'production') {
+    logger.debug("OTP generated in dev mode", { phone, expiresAt: expiresAt.toISOString() });
+  }
   return { success: true, expiresAt, maskedPhone: maskPhone(phone) };
 }
 

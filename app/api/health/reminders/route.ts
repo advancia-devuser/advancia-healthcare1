@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireApprovedUser } from "@/lib/auth";
 import { HealthReminderStatus } from "@prisma/client";
+import { logger } from "@/lib/logger";
 
 const REMINDER_TYPES = new Set(["Appointment", "Medication", "PremiumDue"]);
 const REMINDER_STATUSES = new Set<HealthReminderStatus>([
@@ -55,6 +56,12 @@ function parseDateValue(value: unknown): Date | null {
   return parsed;
 }
 
+function parsePositiveInteger(value: string | null, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 /* ─── GET — List user reminders ─── */
 export async function GET(request: Request) {
   try {
@@ -74,14 +81,22 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "type must be Appointment, Medication, or PremiumDue" }, { status: 400 });
     }
 
+    const page = parsePositiveInteger(searchParams.get("page"), 1);
+    const limit = Math.min(100, parsePositiveInteger(searchParams.get("limit"), 20));
+
     const where: { userId: string; status?: HealthReminderStatus; type?: string } = { userId: user.id };
     if (status) where.status = status;
     if (type) where.type = type;
 
-    const reminders = await prisma.healthReminder.findMany({
-      where,
-      orderBy: { remindAt: "asc" },
-    });
+    const [reminders, _total] = await Promise.all([
+      prisma.healthReminder.findMany({
+        where,
+        orderBy: { remindAt: "asc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.healthReminder.count({ where }),
+    ]);
 
     // Summary counts
     const counts = await prisma.healthReminder.groupBy({
@@ -100,10 +115,10 @@ export async function GET(request: Request) {
       if (key in summary) summary[key] = c._count;
     }
 
-    return NextResponse.json({ reminders, summary });
+    return NextResponse.json({ reminders, summary, total: _total, page, limit });
   } catch (e) {
     if (e instanceof Response) return e;
-    console.error("Health reminders GET error:", e);
+    logger.error("Health reminders GET error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
@@ -164,7 +179,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ reminder });
   } catch (e) {
     if (e instanceof Response) return e;
-    console.error("Health reminders POST error:", e);
+    logger.error("Health reminders POST error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
@@ -255,7 +270,7 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ reminder: updated });
   } catch (e) {
     if (e instanceof Response) return e;
-    console.error("Health reminders PATCH error:", e);
+    logger.error("Health reminders PATCH error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
@@ -291,7 +306,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: true });
   } catch (e) {
     if (e instanceof Response) return e;
-    console.error("Health reminders DELETE error:", e);
+    logger.error("Health reminders DELETE error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

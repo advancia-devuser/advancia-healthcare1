@@ -1,13 +1,41 @@
 {
   "extends": "next/core-web-vitals",
   "rules": {
-    "max-len": "off"
+    "max-len": "off",
+    "no-console": ["warn", { "allow": ["warn", "error"] }],
+    "no-restricted-globals": ["error", "event"],
+    "prefer-const": "warn",
+    "no-unused-expressions": "warn",
+    "eqeqeq": ["error", "always"]
   },
   "overrides": [
+    {
+      "files": ["**/*.ts", "**/*.tsx"],
+      "rules": {
+        "@typescript-eslint/no-explicit-any": "warn",
+        "@typescript-eslint/no-unused-vars": [
+          "warn",
+          { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }
+        ]
+      }
+    },
     {
       "files": ["components/ui/**/*.{ts,tsx}"],
       "rules": {
         "max-len": "off"
+      }
+    },
+    {
+      "files": ["lib/logger.ts"],
+      "rules": {
+        "no-console": "off"
+      }
+    },
+    {
+      "files": ["__tests__/**/*.{ts,tsx}", "scripts/**/*.{js,cjs}"],
+      "rules": {
+        "no-console": "off",
+        "@typescript-eslint/no-explicit-any": "off"
       }
     }
   ]

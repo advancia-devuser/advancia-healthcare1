@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { signUserToken, checkRateLimitPersistent, getClientIP } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
+import { logger } from "@/lib/logger";
 
 function normalizeEmail(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -91,7 +92,7 @@ export async function POST(request: Request) {
       },
     });
   } catch (err) {
-    console.error("[Email Login]", err);
+    logger.error("Email login failed", { err });
     return NextResponse.json({ error: "Login failed" }, { status: 500 });
   }
 }

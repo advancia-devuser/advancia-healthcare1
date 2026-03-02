@@ -1,0 +1,8 @@
+# Prettier ignore file — skip generated / vendored content
+node_modules
+.next
+coverage
+prisma/migrations
+public
+pnpm-lock.yaml
+package-lock.json

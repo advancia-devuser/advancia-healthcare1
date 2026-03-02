@@ -206,8 +206,22 @@ export default function AdminDashboard() {
     }
   };
 
-  const handleDelete = (id: string) => {
-    alert("Delete user not implemented.");
+  const handleDelete = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this user? This action will anonymise their data and suspend their account.")) return;
+    try {
+      const res = await fetch(`/api/admin/users?userId=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to delete user");
+      }
+      setRefresh(r => r + 1);
+      toastSuccess("User has been deleted and anonymised");
+    } catch (err: any) {
+      setError(err.message || "Failed to delete user");
+      toastError(err.message || "Failed to delete user");
+    }
   };
 
   const handleAdminWalletCredit = async () => {

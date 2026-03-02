@@ -171,9 +171,9 @@ describe("Admin Login API", () => {
   });
 
   test("POST authenticates via plaintext fallback in non-production", async () => {
-    delete process.env.ADMIN_PASSWORD_HASH;
-    process.env.ADMIN_PASSWORD = "plain-pass";
-    process.env.NODE_ENV = "test";
+    delete (process.env as any).ADMIN_PASSWORD_HASH;
+    (process.env as any).ADMIN_PASSWORD = "plain-pass";
+    (process.env as any).NODE_ENV = "test";
 
     const req = new Request("http://localhost:3000/api/admin/login", {
       method: "POST",

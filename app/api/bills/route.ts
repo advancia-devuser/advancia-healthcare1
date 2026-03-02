@@ -3,6 +3,7 @@ import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { debitWallet } from "@/lib/ledger";
 import { BillPaymentStatus } from "@prisma/client";
+import { normalizeNonEmptyString, parsePositiveInt as parsePositiveInteger, parseChainId, normalizePositiveAmount, parseOptionalDate } from "@/lib/validators";
 
 const BILL_PAYMENT_STATUSES = new Set<BillPaymentStatus>([
   BillPaymentStatus.PENDING,
@@ -10,36 +11,6 @@ const BILL_PAYMENT_STATUSES = new Set<BillPaymentStatus>([
   BillPaymentStatus.FAILED,
   BillPaymentStatus.SCHEDULED,
 ]);
-
-function normalizeNonEmptyString(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-function parsePositiveInteger(value: string | null, fallback: number): number {
-  if (!value) {
-    return fallback;
-  }
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback;
-  }
-  return parsed;
-}
-
-function parseChainId(value: unknown, fallback: number): number | null {
-  if (value === undefined || value === null || value === "") {
-    return fallback;
-  }
-  const parsed = typeof value === "number" ? Math.trunc(value) : Number.parseInt(String(value), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return null;
-  }
-  return parsed;
-}
 
 function normalizeStatus(value: string | null): BillPaymentStatus | null {
   if (!value) {
@@ -49,31 +20,6 @@ function normalizeStatus(value: string | null): BillPaymentStatus | null {
   return BILL_PAYMENT_STATUSES.has(normalized as BillPaymentStatus)
     ? (normalized as BillPaymentStatus)
     : null;
-}
-
-function normalizePositiveAmount(value: unknown): string | null {
-  if (value === undefined || value === null) {
-    return null;
-  }
-  const raw = typeof value === "string" ? value.trim() : String(value);
-  if (!/^\d+$/.test(raw)) {
-    return null;
-  }
-  if (BigInt(raw) <= BigInt(0)) {
-    return null;
-  }
-  return raw;
-}
-
-function parseOptionalDate(value: unknown): Date | null {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
-  const parsed = new Date(String(value));
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-  return parsed;
 }
 
 /**

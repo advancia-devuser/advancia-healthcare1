@@ -12,7 +12,7 @@ const SPONSORSHIP_POLICY_ID = process.env.NEXT_PUBLIC_ALCHEMY_POLICY_ID || "miss
 const CHAIN_ID = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID ?? '') || 421614;
 const chain = chainNFTMintContractData[CHAIN_ID]?.chain;
 if (!chain && typeof window !== "undefined") {
-    console.error("Invalid chain ID:", CHAIN_ID);
+    // Invalid chain ID - will fallback to default chain
 }
 const fallbackChain = chain || chainNFTMintContractData[421614]?.chain;
 
@@ -24,11 +24,16 @@ const uiConfig = {
       [
         { type: "passkey" },
         { type: "social", authProviderId: "google", mode: "popup" },
+        // WalletConnect disabled — Account Kit v4.x has a hard dependency on
+        // @walletconnect/keyvaluestorage which uses Node.js 'unstorage' that
+        // fails in Next.js 15 webpack builds. A shim is in place at
+        // lib/shims/walletconnect/keyvaluestorage.ts. See that file for
+        // re-enablement steps when the upstream dependency is fixed.
       ],
     ],
     addPasskeyOnSignup: false,
   },
-};
+} as const;
 
 export const config = createConfig(
   {

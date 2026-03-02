@@ -21,7 +21,29 @@ const nextConfig = {
         __dirname,
         "lib/shims/async-storage.ts"
       ),
+      // WalletConnect shims to prevent build errors
+      "@walletconnect/keyvaluestorage": path.resolve(
+        __dirname,
+        "lib/shims/walletconnect/keyvaluestorage.ts"
+      ),
     };
+    
+    // Add fallbacks for Node.js modules that don't exist in browsers
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+      crypto: false,
+      stream: false,
+      http: false,
+      https: false,
+      zlib: false,
+      path: false,
+      os: false,
+      util: false,
+    };
+    
     return config;
   },
   images: {
@@ -71,7 +93,7 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.alchemyapi.io",
+              "script-src 'self' 'unsafe-inline' https://static.alchemyapi.io",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: https://static.alchemyapi.io",
               "font-src 'self'",

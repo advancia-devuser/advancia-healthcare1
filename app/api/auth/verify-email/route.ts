@@ -13,6 +13,7 @@ import { prisma } from "@/lib/db";
 import { getAuthUser, checkRateLimitPersistent, getClientIP } from "@/lib/auth";
 import { randomBytes } from "crypto";
 import { sendVerificationEmail } from "@/lib/email";
+import { logger } from "@/lib/logger";
 
 function normalizeNonEmptyString(value: unknown): string {
   if (typeof value !== "string") return "";
@@ -86,9 +87,10 @@ export async function POST(request: Request) {
         },
       });
 
-      // In production, send this token via email (Resend, SendGrid, etc.)
-      // For now, log it and return a masked response
-      console.log(`[EMAIL VERIFICATION] User ${user.id}: Code = ${verificationCode}`);
+      // Log verification event (code is NEVER logged — sent via email only)
+      if (process.env.NODE_ENV === "development") {
+        console.log(`[EMAIL VERIFICATION] User ${user.id}: code generated (dev only: ${verificationCode})`);
+      }
 
       // Send the verification email
       await sendVerificationEmail(user.email, verificationCode);
@@ -203,7 +205,7 @@ export async function POST(request: Request) {
     );
   } catch (e) {
     if (e instanceof Response) return e;
-    console.error("Email verification error:", e);
+    logger.error("Email verification error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

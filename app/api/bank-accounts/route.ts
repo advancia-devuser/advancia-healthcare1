@@ -2,25 +2,11 @@ import { NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { encrypt } from "@/lib/crypto";
+import { normalizeNonEmptyString, normalizeOptionalString } from "@/lib/validators";
 
 type AccountType = "checking" | "savings";
 
 const ACCOUNT_TYPES = new Set<AccountType>(["checking", "savings"]);
-
-function normalizeNonEmptyString(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-function normalizeOptionalString(value: unknown): string | null {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
-  return normalizeNonEmptyString(value);
-}
 
 function normalizeAccountType(value: unknown): AccountType | null {
   if (value === undefined || value === null || value === "") {

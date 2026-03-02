@@ -27,6 +27,8 @@ export interface EmailResult {
 
 /* ─── Config ─── */
 
+import { logger } from "@/lib/logger";
+
 const RESEND_API_KEY = process.env.RESEND_API_KEY || "";
 const FROM_ADDRESS = process.env.EMAIL_FROM || "Advancia Healthcare <noreply@advancia.health>";
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
@@ -38,9 +40,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<EmailResult>
 
   // Dev mode fallback — log to console
   if (!RESEND_API_KEY) {
-    console.log(
-      `\n📧 [EMAIL — DEV MODE]\n  To: ${to}\n  Subject: ${subject}\n  Body (text): ${text || "(HTML only)"}\n`
-    );
+    logger.debug("Email sent in dev mode", { to, subject });
     return { success: true, messageId: `dev-${Date.now()}` };
   }
 
@@ -62,14 +62,14 @@ export async function sendEmail(options: SendEmailOptions): Promise<EmailResult>
 
     if (!res.ok) {
       const err = await res.text();
-      console.error(`[EMAIL ERROR] ${res.status}: ${err}`);
+      logger.error("Email API error", { status: res.status, err });
       return { success: false, error: err };
     }
 
     const data = await res.json();
     return { success: true, messageId: data.id };
   } catch (err: any) {
-    console.error("[EMAIL ERROR]", err.message);
+    logger.error("Email send failed", { err: err.message });
     return { success: false, error: err.message };
   }
 }

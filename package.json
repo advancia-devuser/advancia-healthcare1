@@ -1,20 +1,38 @@
 {
-  "name": "ui-components-qs-nextjs",
+  "name": "advancia-smart-wallets",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:standalone": "next build && node scripts/prepare-standalone.js",
     "start": "next start",
+    "start:standalone": "node .next/standalone/server.js",
     "lint": "next lint",
     "check:docs-sync": "node scripts/validate-doc-sync.js",
     "hash:admin": "node scripts/generate-admin-password-hash.js",
     "trigger:post-deploy:dispatch": "bash scripts/trigger-post-deploy-verify.sh",
     "trigger:post-deploy:dispatch:ps": "pwsh -File scripts/trigger-post-deploy-verify.ps1",
+    "type-check": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
     "test": "jest --config jest.config.cjs --runInBand",
     "test:e2e": "jest --config jest.config.cjs --runInBand --testPathPattern=e2e",
-    "postinstall": "node scripts/postinstall.js"
+    "postinstall": "node scripts/postinstall.js",
+    "prepare": "husky",
+    "dev:cli": "node scripts/dev-cli.js",
+    "dev:health": "node scripts/dev-cli.js health",
+    "dev:db": "node scripts/dev-cli.js db",
+    "dev:reset": "node scripts/dev-cli.js reset",
+    "dev:secrets": "node scripts/dev-cli.js secrets",
+    "deploy:check": "node scripts/dev-cli.js deploy",
+    "db:reset": "npx prisma migrate reset --force",
+    "db:deploy": "npx prisma migrate deploy",
+    "db:generate": "npx prisma generate",
+    "db:studio": "npx prisma studio",
+    "docker:up": "docker compose -f docker-compose.postgres.yml up -d",
+    "docker:down": "docker compose -f docker-compose.postgres.yml down"
   },
   "dependencies": {
     "@account-kit/core": "^4.84.1",
@@ -32,7 +50,7 @@
     "jose": "^5.10.0",
     "lucide-react": "^0.511.0",
     "next": "^15.5.12",
-    "pino-pretty": "^13.1.1",
+
     "qrcode.react": "^4.2.0",
     "react": "^18",
     "react-dom": "^18",
@@ -55,7 +73,8 @@
     "prisma": "^6.4.1",
     "tailwindcss": "^3.4.4",
     "ts-jest": "^29.2.6",
-    "typescript": "^5"
+    "typescript": "^5",
+    "pino-pretty": "^13.1.1"
   },
   "overrides": {
     "@base-org/account": "2.5.2",
@@ -63,5 +82,13 @@
     "@tanstack/form-core": "^0.42.1",
     "@tanstack/react-form": "^0.42.1",
     "@tanstack/zod-form-adapter": "^0.42.1"
+  },
+  "lint-staged": {
+    "*.{ts,tsx,js,jsx}": [
+      "prettier --write"
+    ],
+    "*.{json,md,yml,yaml,css}": [
+      "prettier --write"
+    ]
   }
 }

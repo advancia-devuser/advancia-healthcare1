@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireApprovedUser, checkRateLimitPersistent, getClientIP } from "@/lib/auth";
 import { scryptSync, randomBytes, timingSafeEqual } from "crypto";
+import { logger } from "@/lib/logger";
 
 const SALT_LENGTH = 16;
 const PIN_REGEX = /^\d{6}$/;
@@ -208,7 +209,7 @@ export async function POST(request: Request) {
     );
   } catch (e) {
     if (e instanceof Response) return e;
-    console.error("PIN error:", e);
+    logger.error("PIN error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

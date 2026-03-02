@@ -11,6 +11,7 @@ jest.mock("@/lib/db", () => ({
   prisma: {
     subscription: {
       findMany: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
       updateMany: jest.fn(),
       create: jest.fn(),
       findFirst: jest.fn(),

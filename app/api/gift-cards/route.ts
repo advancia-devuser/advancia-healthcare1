@@ -75,6 +75,12 @@ function normalizeGiftCardStatus(value: string | null): GiftCardStatus | null {
   return GIFT_CARD_STATUSES.has(normalized as GiftCardStatus) ? (normalized as GiftCardStatus) : null;
 }
 
+function parsePositiveInteger(value: string | null, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 /**
  * GET /api/gift-cards?status=ACTIVE
  * Returns user's gift cards.
@@ -89,15 +95,23 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: "status must be ACTIVE, REDEEMED, or EXPIRED" }, { status: 400 });
     }
 
+    const page = parsePositiveInteger(searchParams.get("page"), 1);
+    const limit = Math.min(100, parsePositiveInteger(searchParams.get("limit"), 20));
+
     const where: { userId: string; status?: GiftCardStatus } = { userId: user.id };
     if (status) where.status = status;
 
-    const cards = await prisma.giftCard.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-    });
+    const [cards, total] = await Promise.all([
+      prisma.giftCard.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.giftCard.count({ where }),
+    ]);
 
-    return NextResponse.json({ cards });
+    return NextResponse.json({ cards, total, page, limit });
   } catch (res) {
     if (res instanceof Response) return res;
     return NextResponse.json({ error: "Server error" }, { status: 500 });

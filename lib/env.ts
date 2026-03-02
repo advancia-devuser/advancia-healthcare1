@@ -1,8 +1,10 @@
+import { logger } from "@/lib/logger";
+
 const isServer = typeof window === "undefined";
 
 function warnIfServer(message: string) {
   if (isServer) {
-    console.warn(`⚠️ ${message}`);
+    logger.warn(message);
   }
 }
 

@@ -12,6 +12,7 @@ import { prisma } from "@/lib/db";
 import { isAdminRequest } from "@/lib/auth";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { generateTotpSecret, verifyTotpCode, generateTotpUri } from "@/lib/totp";
+import { logger } from "@/lib/logger";
 
 type Admin2FAAction = "setup" | "verify" | "disable" | "status";
 
@@ -168,7 +169,7 @@ export async function POST(request: Request): Promise<Response> {
       { status: 400 }
     );
   } catch (e) {
-    console.error("Admin 2FA error:", e);
+    logger.error("Admin 2FA error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  1. IDENTITY & ACCESS
+// ═══════════════════════════════════════════════════════════════
+
 model User {
   id                      String               @id @default(uuid())
   address                 String               @unique
@@ -67,6 +71,10 @@ model Wallet {
   @@index([smartAccountAddress])
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  2. WALLET & BALANCES
+// ═══════════════════════════════════════════════════════════════
+
 model WalletBalance {
   id        String   @id @default(uuid())
   userId    String
@@ -79,6 +87,10 @@ model WalletBalance {
   @@unique([userId, asset])
   @@index([asset])
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  3. TRANSACTIONS & TRANSFERS
+// ═══════════════════════════════════════════════════════════════
 
 model Transaction {
   id        String            @id @default(uuid())
@@ -133,6 +145,10 @@ model Conversion {
   @@index([userId])
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  4. CARDS & BANKING
+// ═══════════════════════════════════════════════════════════════
+
 model CardRequest {
   id              String        @id @default(uuid())
   userId          String
@@ -177,6 +193,10 @@ model AuditLog {
   @@index([createdAt])
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  5. PAYMENTS & INSTALLMENTS
+// ═══════════════════════════════════════════════════════════════
+
 model Installment {
   id               String               @id @default(uuid())
   userId           String
@@ -212,6 +232,10 @@ model InstallmentPayment {
   @@index([installmentId])
   @@index([dueDate])
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  6. SOCIAL & NOTIFICATIONS
+// ═══════════════════════════════════════════════════════════════
 
 model Contact {
   id         String   @id @default(uuid())
@@ -262,6 +286,10 @@ model BillPayment {
   @@index([userId])
   @@index([status])
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  7. BUDGETS & LOYALTY
+// ═══════════════════════════════════════════════════════════════
 
 model Budget {
   id          String   @id @default(uuid())
@@ -330,6 +358,10 @@ model BankAccount {
   @@index([userId])
 }
 
+// ═══════════════════════════════════════════════════════════════
+//  8. SUBSCRIPTIONS & DEVICES
+// ═══════════════════════════════════════════════════════════════
+
 model Subscription {
   id              String             @id @default(uuid())
   userId          String
@@ -381,6 +413,10 @@ model WebAuthnCredential {
 
   @@index([userId])
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  9. HEALTHCARE
+// ═══════════════════════════════════════════════════════════════
 
 model HealthCard {
   id            String              @id @default(uuid())
@@ -434,6 +470,10 @@ model HealthReminder {
   @@index([remindAt])
   @@index([status])
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  10. ADMIN & PLATFORM
+// ═══════════════════════════════════════════════════════════════
 
 model AdminConfig {
   key       String   @id
@@ -554,6 +594,10 @@ model PaymentRequest {
   @@index([requestId])
   @@index([status])
 }
+
+// ═══════════════════════════════════════════════════════════════
+//  11. ENUMS
+// ═══════════════════════════════════════════════════════════════
 
 enum UserRole {
   USER

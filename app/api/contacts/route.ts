@@ -1,28 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-
-function normalizeNonEmptyString(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-function normalizeOptionalString(value: unknown): string | null {
-  if (value === undefined || value === null || value === "") {
-    return null;
-  }
-  return normalizeNonEmptyString(value);
-}
+import { normalizeNonEmptyString, normalizeOptionalString, isLikelyEmail } from "@/lib/validators";
 
 function normalizeSearch(value: string | null): string {
   return (value || "").trim();
-}
-
-function isLikelyEmail(value: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
 /**

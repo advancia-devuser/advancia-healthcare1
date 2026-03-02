@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { sendAccountStatusEmail } from "@/lib/email";
 import { sendAccountStatusSms } from "@/lib/sms";
 import { Prisma, UserStatus } from "@prisma/client";
+import { logger } from "@/lib/logger";
 
 const USER_STATUS_VALUES = new Set<UserStatus>([
   UserStatus.PENDING,
@@ -166,14 +167,14 @@ export async function PATCH(request: Request) {
       // Send email notification if user has an email
       if (user.email) {
         sendAccountStatusEmail(user.email, notificationStatus).catch((err) =>
-          console.error("[EMAIL] Failed to send account status email:", err)
+          logger.error("Failed to send account status email", { err })
         );
       }
 
       // Send SMS notification if user has a phone number
       if (user.phone) {
         sendAccountStatusSms(user.phone, notificationStatus).catch((err) =>
-          console.error("[SMS] Failed to send account status SMS:", err)
+          logger.error("Failed to send account status SMS", { err })
         );
       }
     }
@@ -195,5 +196,75 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json({ error: "Failed to update user" }, { status: 500 });
+  }
+}
+
+/**
+ * DELETE /api/admin/users?userId=...
+ * Admin: soft-delete a user by setting status to SUSPENDED and anonymising PII.
+ * Hard-delete of related records is intentionally avoided to preserve audit trails.
+ */
+export async function DELETE(request: Request) {
+  if (!(await isAdminRequest())) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId")?.trim();
+
+    if (!userId) {
+      return NextResponse.json({ error: "userId query parameter is required" }, { status: 400 });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    // Soft-delete: anonymise PII and suspend the account
+    const anonymised = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        status: UserStatus.SUSPENDED,
+        email: null,
+        phone: null,
+        name: `[deleted-${userId.slice(0, 8)}]`,
+        emailVerified: false,
+        emailVerificationToken: null,
+        emailVerificationExpiry: null,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        userId,
+        actor: "ADMIN",
+        action: "USER_DELETE",
+        meta: JSON.stringify({
+          previousEmail: user.email ? `${user.email.slice(0, 3)}***` : null,
+          previousStatus: user.status,
+        }),
+      },
+    });
+
+    logger.info("Admin deleted user", { userId, previousStatus: user.status });
+
+    return NextResponse.json({
+      success: true,
+      message: "User has been anonymised and suspended.",
+      user: {
+        id: anonymised.id,
+        status: anonymised.status,
+        name: anonymised.name,
+      },
+    });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025") {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    logger.error("Admin delete user error", { err });
+    return NextResponse.json({ error: "Failed to delete user" }, { status: 500 });
   }
 }

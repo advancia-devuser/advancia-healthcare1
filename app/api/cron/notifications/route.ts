@@ -4,7 +4,7 @@
  * GET /api/cron/notifications
  *
  * Called periodically. Scans recent AuditLog entries that haven't been
- * notified and delivers email/push notifications.
+ * notified and delivers email/push/SMS notifications.
  *
  * Notifiable events:
  *   - CREDIT_RECEIVE (deposit arrived)
@@ -15,15 +15,17 @@
  *   - CARD_APPROVE / CARD_REJECT
  *   - RECONCILE_MISMATCH (admin alert)
  *
- * For now, logs to console + stores delivery receipts.
- * Replace the `deliver()` stub with real email (Resend/SES/SendGrid)
- * or push (Firebase/OneSignal) in production.
+ * Delivery channels:
+ *   - Email via Resend (sendNotificationEmail)
+ *   - SMS via Brevo/Twilio/Textbelt (sendNotificationSms)
+ *   - Push: not yet integrated (Firebase/OneSignal planned)
  */
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendNotificationEmail } from "@/lib/email";
 import { sendNotificationSms } from "@/lib/sms";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +48,7 @@ const NOTIFIABLE_ACTIONS = [
 // How far back to scan (minutes)
 const LOOKBACK_MINUTES = 15;
 
-/* ─── Delivery stub ─── */
+/* ─── Notification delivery ─── */
 
 interface NotificationPayload {
   userId: string | null;
@@ -57,7 +59,7 @@ interface NotificationPayload {
 }
 
 /**
- * Deliver a notification via email + console log.
+ * Deliver a notification via email + SMS.
  * Returns true on success.
  */
 async function deliver(payload: NotificationPayload): Promise<boolean> {
@@ -66,7 +68,7 @@ async function deliver(payload: NotificationPayload): Promise<boolean> {
     const details = payload.meta ? (() => { try { return JSON.parse(payload.meta!); } catch { return {}; } })() : {};
     const result = await sendNotificationEmail(payload.email, payload.action, details);
     if (!result.success) {
-      console.warn(`[NOTIFICATION] Email failed for ${payload.action}: ${result.error}`);
+      logger.warn("Notification email failed", { action: payload.action, error: result.error });
     }
   }
 
@@ -75,15 +77,18 @@ async function deliver(payload: NotificationPayload): Promise<boolean> {
     const detail = payload.meta ? (() => { try { const p = JSON.parse(payload.meta!); return Object.values(p).filter(v => typeof v === 'string' || typeof v === 'number').slice(0, 2).join(', '); } catch { return undefined; } })() : undefined;
     const smsResult = await sendNotificationSms(payload.phone, payload.action, detail || undefined);
     if (!smsResult.success) {
-      console.warn(`[NOTIFICATION] SMS failed for ${payload.action}: ${smsResult.error}`);
+      logger.warn("Notification SMS failed", { action: payload.action, error: smsResult.error });
     }
   }
 
   // Console log for observability
-  console.log(
-    `[NOTIFICATION] ${payload.action} → user=${payload.userId} email=${payload.email} phone=${payload.phone}`,
-    payload.meta ? JSON.parse(payload.meta) : ""
-  );
+  logger.info("Notification delivered", {
+    action: payload.action,
+    userId: payload.userId,
+    email: payload.email,
+    phone: payload.phone,
+    meta: payload.meta ? JSON.parse(payload.meta) : undefined,
+  });
   return true;
 }
 

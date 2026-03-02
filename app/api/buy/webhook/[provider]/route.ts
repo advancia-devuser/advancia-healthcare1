@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { creditWallet } from "@/lib/ledger";
 import crypto from "crypto";
+import { logger } from "@/lib/logger";
 
 /* ─── Signature Verification Helpers ─── */
 
@@ -62,7 +63,7 @@ async function processWebhook(provider: "TRANSAK" | "MOONPAY" | "RAMP", data: We
 
   // If not found by providerOrderId, it might be a new webhook — try to match
   if (!order) {
-    console.warn(`[Webhook] No order found for ${provider} orderId=${data.providerOrderId}`);
+    logger.warn("No order found for webhook", { provider, providerOrderId: data.providerOrderId });
     return { processed: false, reason: "Order not found" };
   }
 
@@ -104,7 +105,7 @@ async function processWebhook(provider: "TRANSAK" | "MOONPAY" | "RAMP", data: We
           },
         });
       } catch (err) {
-        console.error(`[Webhook] Failed to credit wallet for order ${order.id}:`, err);
+        logger.error("Failed to credit wallet for order", { orderId: order.id, err });
       }
     }
 

@@ -1,0 +1,1135 @@
+openapi: 3.1.0
+info:
+  title: Advancia Smart Wallets API
+  version: "1.0.0"
+  description: |
+    REST API for the Advancia Smart Wallets platform — a fintech super-app
+    with embedded smart wallets (ERC-4337), payments, healthcare, banking,
+    loyalty, subscriptions, and admin management.
+
+    ## Authentication
+    Most endpoints require a JWT session token obtained from `/api/auth/*`.
+    Pass it as a cookie (`session`) or `Authorization: Bearer <token>` header.
+
+    Admin endpoints require a separate admin session via `/api/admin/login`.
+
+    ## Versioning
+    All endpoints are available under both `/api/*` and `/api/v1/*`.
+    The `X-API-Version` response header indicates the active version.
+
+    ## Rate Limiting
+    Auth endpoints (`/api/auth/*`) are rate-limited to 20 requests/minute per IP.
+    Exceeding the limit returns `429 Too Many Requests` with a `Retry-After` header.
+  contact:
+    name: Advancia Dev Team
+    email: security@advancia.health
+  license:
+    name: Proprietary
+
+servers:
+  - url: http://localhost:3000
+    description: Local development
+  - url: https://advancia-healthcare1.vercel.app
+    description: Production (Vercel)
+
+tags:
+  - name: Auth
+    description: Authentication — register, login, session, 2FA, PIN, OTP, email
+  - name: Wallets
+    description: Smart wallet creation and balance management
+  - name: Transactions
+    description: On-chain transaction history, transfers
+  - name: Payments
+    description: QR payments, payment requests, payment history
+  - name: Cards
+    description: Virtual/physical card requests and management
+  - name: Banking
+    description: Bank account linking
+  - name: Bills
+    description: Bill payments and scheduling
+  - name: Budgets
+    description: Spending budgets per category
+  - name: Installments
+    description: Buy-now-pay-later installment plans
+  - name: Subscriptions
+    description: User subscription tiers
+  - name: Contacts
+    description: Address book / saved contacts
+  - name: Devices
+    description: Device/session management
+  - name: Notifications
+    description: In-app and push notifications
+  - name: Conversions
+    description: Asset-to-asset conversion
+  - name: Buy
+    description: Fiat-to-crypto on-ramp (Transak, MoonPay, Ramp)
+  - name: Gift Cards
+    description: Gift card purchase and management
+  - name: Loyalty Cards
+    description: Loyalty/rewards card storage
+  - name: Health
+    description: Health overview
+  - name: Health Cards
+    description: Insurance, vaccination, prescription cards (encrypted)
+  - name: Health Transactions
+    description: Healthcare-related payments
+  - name: Health Reminders
+    description: Medication, appointment, and premium reminders
+  - name: Booking
+    description: Hyperbaric chamber booking
+  - name: Profile
+    description: User profile management
+  - name: Webhooks
+    description: Inbound webhooks (Alchemy, on-ramp providers)
+  - name: Admin
+    description: Admin panel — users, stats, ledger, cards, withdrawals
+  - name: Cron
+    description: Scheduled background jobs (CRON_SECRET required)
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+    cronAuth:
+      type: http
+      scheme: bearer
+      description: CRON_SECRET bearer token for cron endpoints
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: string
+          example: "Invalid request body"
+
+    PaginatedParams:
+      type: object
+      properties:
+        page:
+          type: integer
+          minimum: 1
+          default: 1
+        limit:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+
+    PaginatedMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        address:
+          type: string
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        role:
+          type: string
+          enum: [USER, ADMIN]
+        status:
+          type: string
+          enum: [PENDING, APPROVED, REJECTED, SUSPENDED]
+        createdAt:
+          type: string
+          format: date-time
+
+    Wallet:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        smartAccountAddress:
+          type: string
+        chainId:
+          type: integer
+        balance:
+          type: string
+
+    Transaction:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [SEND, RECEIVE, WITHDRAW, CONVERT, BUY]
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, FAILED, CANCELLED]
+        from:
+          type: string
+        to:
+          type: string
+        asset:
+          type: string
+        amount:
+          type: string
+        txHash:
+          type: string
+        chainId:
+          type: integer
+
+  responses:
+    Unauthorized:
+      description: Missing or invalid authentication
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Unauthorized"
+    BadRequest:
+      description: Invalid request body or parameters
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+    TooManyRequests:
+      description: Rate limit exceeded
+      headers:
+        Retry-After:
+          schema:
+            type: integer
+          description: Seconds until the rate limit window resets
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Too many requests. Please try again later."
+    ServerError:
+      description: Unexpected server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error"
+          example:
+            error: "Server error"
+
+security:
+  - bearerAuth: []
+  - cookieAuth: []
+
+# ═══════════════════════════════════════════════════════════════
+#  PATHS — grouped by tag / domain
+# ═══════════════════════════════════════════════════════════════
+
+paths:
+  # ─── Auth ──────────────────────────────────────
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register via wallet signature
+      security: []
+      responses:
+        "201": { description: "User created" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/auth/email/register:
+    post:
+      tags: [Auth]
+      summary: Register with email and password
+      security: []
+      responses:
+        "201": { description: "User created" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/auth/email/login:
+    post:
+      tags: [Auth]
+      summary: Login with email and password
+      security: []
+      responses:
+        "200": { description: "Session created" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/TooManyRequests" }
+
+  /api/auth/session:
+    get:
+      tags: [Auth]
+      summary: Get current session info
+      responses:
+        "200": { description: "Session details" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Auth]
+      summary: Create session (wallet-based)
+      security: []
+      responses:
+        "200": { description: "Session created" }
+    delete:
+      tags: [Auth]
+      summary: Logout / destroy session
+      responses:
+        "200": { description: "Session destroyed" }
+
+  /api/auth/me:
+    get:
+      tags: [Auth]
+      summary: Get authenticated user profile
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: "#/components/schemas/User"
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/auth/pin:
+    post:
+      tags: [Auth]
+      summary: Set or verify PIN
+      responses:
+        "200": { description: "PIN accepted" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/auth/2fa:
+    post:
+      tags: [Auth]
+      summary: Setup or verify TOTP 2FA
+      responses:
+        "200": { description: "2FA verified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/auth/otp:
+    post:
+      tags: [Auth]
+      summary: Request OTP
+      security: []
+      responses:
+        "200": { description: "OTP sent" }
+    patch:
+      tags: [Auth]
+      summary: Verify OTP
+      security: []
+      responses:
+        "200": { description: "OTP verified" }
+    delete:
+      tags: [Auth]
+      summary: Cancel OTP
+      responses:
+        "200": { description: "OTP cancelled" }
+
+  /api/auth/verify-email:
+    post:
+      tags: [Auth]
+      summary: Verify email with token
+      security: []
+      responses:
+        "200": { description: "Email verified" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  # ─── Wallets ───────────────────────────────────
+  /api/wallets:
+    get:
+      tags: [Wallets]
+      summary: Get wallet and balances
+      responses:
+        "200":
+          description: Wallet with multi-asset balances
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  wallet:
+                    $ref: "#/components/schemas/Wallet"
+                  balances:
+                    type: array
+                    items:
+                      type: object
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [Wallets]
+      summary: Create smart wallet
+      responses:
+        "201": { description: "Wallet created" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  # ─── Transactions ──────────────────────────────
+  /api/transactions:
+    get:
+      tags: [Transactions]
+      summary: List user transactions (paginated)
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        "200":
+          description: Paginated transaction list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  transactions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Transaction"
+                  total: { type: integer }
+                  page: { type: integer }
+                  limit: { type: integer }
+
+  /api/transfers:
+    get:
+      tags: [Transactions]
+      summary: List transfers (paginated)
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200": { description: "Transfer list with pagination" }
+    post:
+      tags: [Transactions]
+      summary: Initiate a transfer
+      responses:
+        "201": { description: "Transfer initiated" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/withdrawals:
+    get:
+      tags: [Transactions]
+      summary: List withdrawal requests (paginated)
+      responses:
+        "200": { description: "Paginated withdrawals" }
+    post:
+      tags: [Transactions]
+      summary: Request a withdrawal
+      responses:
+        "201": { description: "Withdrawal requested" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /api/conversions:
+    get:
+      tags: [Conversions]
+      summary: List conversion history
+      responses:
+        "200": { description: "Conversions list" }
+    post:
+      tags: [Conversions]
+      summary: Convert between assets
+      responses:
+        "201": { description: "Conversion initiated" }
+
+  # ─── Payments ──────────────────────────────────
+  /api/payments/history:
+    get:
+      tags: [Payments]
+      summary: Payment history (paginated)
+      responses:
+        "200": { description: "Paginated payment history" }
+
+  /api/payments/qr:
+    get:
+      tags: [Payments]
+      summary: Get QR code for wallet address
+      responses:
+        "200": { description: "QR code data" }
+    post:
+      tags: [Payments]
+      summary: Generate payment QR
+      responses:
+        "201": { description: "QR created" }
+
+  /api/payments/request:
+    get:
+      tags: [Payments]
+      summary: List payment requests (paginated)
+      responses:
+        "200": { description: "Payment requests" }
+    post:
+      tags: [Payments]
+      summary: Create a payment request
+      responses:
+        "201": { description: "Payment request created" }
+    patch:
+      tags: [Payments]
+      summary: Update payment request status
+      responses:
+        "200": { description: "Request updated" }
+
+  # ─── Cards & Banking ──────────────────────────
+  /api/cards:
+    get:
+      tags: [Cards]
+      summary: List card requests
+      responses:
+        "200": { description: "User cards" }
+    post:
+      tags: [Cards]
+      summary: Request a new card
+      responses:
+        "201": { description: "Card requested" }
+    patch:
+      tags: [Cards]
+      summary: Activate or freeze a card
+      responses:
+        "200": { description: "Card updated" }
+
+  /api/bank-accounts:
+    get:
+      tags: [Banking]
+      summary: List linked bank accounts
+      responses:
+        "200": { description: "Bank accounts" }
+    post:
+      tags: [Banking]
+      summary: Link a bank account
+      responses:
+        "201": { description: "Bank account linked" }
+    delete:
+      tags: [Banking]
+      summary: Remove a bank account
+      responses:
+        "200": { description: "Bank account removed" }
+
+  # ─── Bills & Budgets ──────────────────────────
+  /api/bills:
+    get:
+      tags: [Bills]
+      summary: List bill payments (paginated)
+      responses:
+        "200": { description: "Paginated bills" }
+    post:
+      tags: [Bills]
+      summary: Pay or schedule a bill
+      responses:
+        "201": { description: "Bill payment created" }
+
+  /api/budgets:
+    get:
+      tags: [Budgets]
+      summary: List budgets
+      responses:
+        "200": { description: "User budgets" }
+    post:
+      tags: [Budgets]
+      summary: Create a budget
+      responses:
+        "201": { description: "Budget created" }
+    patch:
+      tags: [Budgets]
+      summary: Update a budget
+      responses:
+        "200": { description: "Budget updated" }
+    delete:
+      tags: [Budgets]
+      summary: Delete a budget
+      responses:
+        "200": { description: "Budget deleted" }
+
+  # ─── Installments ─────────────────────────────
+  /api/installments:
+    get:
+      tags: [Installments]
+      summary: List installment plans (paginated)
+      responses:
+        "200": { description: "Paginated installments" }
+    post:
+      tags: [Installments]
+      summary: Create an installment plan
+      responses:
+        "201": { description: "Installment created" }
+
+  # ─── Subscriptions ────────────────────────────
+  /api/subscriptions:
+    get:
+      tags: [Subscriptions]
+      summary: List user subscriptions (paginated)
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200": { description: "Paginated subscriptions" }
+    post:
+      tags: [Subscriptions]
+      summary: Subscribe to a tier
+      responses:
+        "201": { description: "Subscription created" }
+    patch:
+      tags: [Subscriptions]
+      summary: Cancel, pause, or resume subscription
+      responses:
+        "200": { description: "Subscription updated" }
+
+  # ─── Social ───────────────────────────────────
+  /api/contacts:
+    get:
+      tags: [Contacts]
+      summary: List contacts (searchable)
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        "200": { description: "Contact list" }
+    post:
+      tags: [Contacts]
+      summary: Add a contact
+      responses:
+        "201": { description: "Contact added" }
+    delete:
+      tags: [Contacts]
+      summary: Remove a contact
+      responses:
+        "200": { description: "Contact removed" }
+
+  /api/devices:
+    get:
+      tags: [Devices]
+      summary: List registered devices
+      responses:
+        "200": { description: "Device list" }
+    post:
+      tags: [Devices]
+      summary: Register a device
+      responses:
+        "201": { description: "Device registered" }
+    delete:
+      tags: [Devices]
+      summary: Remove a device
+      responses:
+        "200": { description: "Device removed" }
+
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications (paginated)
+      responses:
+        "200": { description: "Notifications" }
+    patch:
+      tags: [Notifications]
+      summary: Mark notification as read
+      responses:
+        "200": { description: "Notification updated" }
+    delete:
+      tags: [Notifications]
+      summary: Delete notifications
+      responses:
+        "200": { description: "Notifications deleted" }
+
+  # ─── Commerce ─────────────────────────────────
+  /api/buy:
+    get:
+      tags: [Buy]
+      summary: List crypto purchase orders
+      responses:
+        "200": { description: "Orders list" }
+    post:
+      tags: [Buy]
+      summary: Create fiat-to-crypto order
+      responses:
+        "201": { description: "Order created" }
+
+  /api/buy/webhook/{provider}:
+    post:
+      tags: [Webhooks]
+      summary: On-ramp provider webhook
+      security: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+            enum: [transak, moonpay, ramp]
+      responses:
+        "200": { description: "Webhook processed" }
+
+  /api/gift-cards:
+    get:
+      tags: [Gift Cards]
+      summary: List gift cards (paginated)
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [ACTIVE, REDEEMED, EXPIRED] }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200": { description: "Paginated gift cards" }
+    post:
+      tags: [Gift Cards]
+      summary: Purchase a gift card
+      responses:
+        "201": { description: "Gift card purchased" }
+    patch:
+      tags: [Gift Cards]
+      summary: Redeem a gift card
+      responses:
+        "200": { description: "Gift card redeemed" }
+
+  /api/loyalty-cards:
+    get:
+      tags: [Loyalty Cards]
+      summary: List loyalty cards (paginated)
+      parameters:
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200": { description: "Paginated loyalty cards" }
+    post:
+      tags: [Loyalty Cards]
+      summary: Add a loyalty card
+      responses:
+        "201": { description: "Loyalty card added" }
+    patch:
+      tags: [Loyalty Cards]
+      summary: Update loyalty card
+      responses:
+        "200": { description: "Card updated" }
+    delete:
+      tags: [Loyalty Cards]
+      summary: Delete a loyalty card
+      responses:
+        "200": { description: "Card deleted" }
+
+  # ─── Healthcare ───────────────────────────────
+  /api/health:
+    get:
+      tags: [Health]
+      summary: Health overview / dashboard stats
+      responses:
+        "200": { description: "Health summary" }
+
+  /api/health/cards:
+    get:
+      tags: [Health Cards]
+      summary: List health cards (paginated, decrypted)
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [ACTIVE, EXPIRED, INACTIVE] }
+        - name: cardType
+          in: query
+          schema: { type: string, enum: [INSURANCE, VACCINATION, PRESCRIPTION] }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200": { description: "Paginated health cards (decrypted)" }
+    post:
+      tags: [Health Cards]
+      summary: Add a health card (encrypted at rest)
+      responses:
+        "201": { description: "Health card added" }
+    patch:
+      tags: [Health Cards]
+      summary: Update or deactivate a health card
+      responses:
+        "200": { description: "Card updated" }
+    delete:
+      tags: [Health Cards]
+      summary: Delete a health card
+      responses:
+        "200": { description: "Card deleted" }
+
+  /api/health/transactions:
+    get:
+      tags: [Health Transactions]
+      summary: List health transactions (paginated)
+      responses:
+        "200": { description: "Paginated health transactions" }
+    post:
+      tags: [Health Transactions]
+      summary: Create a health transaction
+      responses:
+        "201": { description: "Transaction created" }
+
+  /api/health/reminders:
+    get:
+      tags: [Health Reminders]
+      summary: List reminders (paginated) with summary counts
+      parameters:
+        - name: status
+          in: query
+          schema: { type: string, enum: [PENDING, SENT, COMPLETED] }
+        - name: type
+          in: query
+          schema: { type: string, enum: [Appointment, Medication, PremiumDue] }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 20 }
+      responses:
+        "200": { description: "Reminders with summary" }
+    post:
+      tags: [Health Reminders]
+      summary: Set a reminder
+      responses:
+        "201": { description: "Reminder created" }
+    patch:
+      tags: [Health Reminders]
+      summary: Mark reminder completed or update
+      responses:
+        "200": { description: "Reminder updated" }
+    delete:
+      tags: [Health Reminders]
+      summary: Delete a reminder
+      responses:
+        "200": { description: "Reminder deleted" }
+
+  # ─── Booking ──────────────────────────────────
+  /api/booking:
+    get:
+      tags: [Booking]
+      summary: List user bookings
+      responses:
+        "200": { description: "Bookings list" }
+    post:
+      tags: [Booking]
+      summary: Create a booking
+      responses:
+        "201": { description: "Booking created" }
+    patch:
+      tags: [Booking]
+      summary: Cancel or complete a booking
+      responses:
+        "200": { description: "Booking updated" }
+
+  # ─── Profile ──────────────────────────────────
+  /api/profile:
+    get:
+      tags: [Profile]
+      summary: Get full user profile with wallet info
+      responses:
+        "200": { description: "Profile data" }
+    patch:
+      tags: [Profile]
+      summary: Update profile fields
+      responses:
+        "200": { description: "Profile updated" }
+
+  # ─── Webhooks ─────────────────────────────────
+  /api/webhooks/alchemy:
+    get:
+      tags: [Webhooks]
+      summary: Alchemy webhook health check
+      security: []
+      responses:
+        "200": { description: "OK" }
+    post:
+      tags: [Webhooks]
+      summary: Alchemy address activity webhook
+      security: []
+      responses:
+        "200": { description: "Processed" }
+
+  # ─── Admin ────────────────────────────────────
+  /api/admin/login:
+    post:
+      tags: [Admin]
+      summary: Admin login
+      security: []
+      responses:
+        "200": { description: "Admin session created" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      tags: [Admin]
+      summary: Admin logout
+      responses:
+        "200": { description: "Admin session destroyed" }
+
+  /api/admin/stats:
+    get:
+      tags: [Admin]
+      summary: Platform-wide statistics
+      responses:
+        "200": { description: "Stats object" }
+
+  /api/admin/users:
+    get:
+      tags: [Admin]
+      summary: List all users (admin)
+      responses:
+        "200": { description: "User list" }
+    patch:
+      tags: [Admin]
+      summary: Update user status / role
+      responses:
+        "200": { description: "User updated" }
+    delete:
+      tags: [Admin]
+      summary: Delete a user
+      responses:
+        "200": { description: "User deleted" }
+
+  /api/admin/wallet:
+    get:
+      tags: [Admin]
+      summary: View platform treasury
+      responses:
+        "200": { description: "Admin wallet balances" }
+    post:
+      tags: [Admin]
+      summary: Credit platform treasury
+      responses:
+        "200": { description: "Treasury credited" }
+    patch:
+      tags: [Admin]
+      summary: Adjust treasury
+      responses:
+        "200": { description: "Treasury adjusted" }
+
+  /api/admin/withdrawals:
+    get:
+      tags: [Admin]
+      summary: List pending withdrawals
+      responses:
+        "200": { description: "Withdrawal list" }
+    patch:
+      tags: [Admin]
+      summary: Approve or reject withdrawal
+      responses:
+        "200": { description: "Withdrawal updated" }
+
+  /api/admin/cards:
+    get:
+      tags: [Admin]
+      summary: List card requests
+      responses:
+        "200": { description: "Card requests" }
+    patch:
+      tags: [Admin]
+      summary: Approve, reject, or ship card
+      responses:
+        "200": { description: "Card request updated" }
+
+  /api/admin/bookings:
+    get:
+      tags: [Admin]
+      summary: List all bookings
+      responses:
+        "200": { description: "Bookings" }
+    patch:
+      tags: [Admin]
+      summary: Confirm or update booking
+      responses:
+        "200": { description: "Booking updated" }
+
+  /api/admin/installments:
+    get:
+      tags: [Admin]
+      summary: List installment plans
+      responses:
+        "200": { description: "Installments" }
+    post:
+      tags: [Admin]
+      summary: Admin create installment
+      responses:
+        "201": { description: "Installment created" }
+
+  /api/admin/subscriptions:
+    get:
+      tags: [Admin]
+      summary: List all subscriptions
+      responses:
+        "200": { description: "Subscriptions" }
+    patch:
+      tags: [Admin]
+      summary: Upgrade, cancel, or modify subscription
+      responses:
+        "200": { description: "Subscription updated" }
+
+  /api/admin/payment-requests:
+    get:
+      tags: [Admin]
+      summary: List payment requests
+      responses:
+        "200": { description: "Payment requests" }
+    patch:
+      tags: [Admin]
+      summary: Update payment request
+      responses:
+        "200": { description: "Request updated" }
+
+  /api/admin/ledger:
+    post:
+      tags: [Admin]
+      summary: Record ledger entry
+      responses:
+        "201": { description: "Entry recorded" }
+    patch:
+      tags: [Admin]
+      summary: Adjust ledger entry
+      responses:
+        "200": { description: "Entry adjusted" }
+
+  /api/admin/2fa:
+    post:
+      tags: [Admin]
+      summary: Admin 2FA management
+      responses:
+        "200": { description: "Operation completed" }
+
+  # ─── Cron ─────────────────────────────────────
+  /api/cron/health-reminders:
+    get:
+      tags: [Cron]
+      summary: Process due health reminders (sends notifications)
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Processed count" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /api/cron/subscriptions:
+    post:
+      tags: [Cron]
+      summary: Process subscription renewals and expirations
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Processed count" }
+
+  /api/cron/withdrawals:
+    get:
+      tags: [Cron]
+      summary: Process pending on-chain withdrawals
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Processed count" }
+
+  /api/cron/reconcile:
+    get:
+      tags: [Cron]
+      summary: Reconcile on-chain balances with DB
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Reconciliation results" }
+
+  /api/cron/payment-requests:
+    get:
+      tags: [Cron]
+      summary: Expire stale payment requests
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Expired count" }
+
+  /api/cron/notifications:
+    get:
+      tags: [Cron]
+      summary: Process queued push notifications
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Sent count" }
+
+  /api/cron/installments:
+    get:
+      tags: [Cron]
+      summary: Process due installment payments
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Processed count" }
+
+  /api/cron/deposits:
+    get:
+      tags: [Cron]
+      summary: Detect and credit on-chain deposits
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Detected deposits" }
+
+  /api/cron/health-expiry:
+    get:
+      tags: [Cron]
+      summary: Expire health cards past their expiry date
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Expired count" }
+
+  /api/cron/convert:
+    get:
+      tags: [Cron]
+      summary: Check status of pending conversions
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Updated count" }
+    post:
+      tags: [Cron]
+      summary: Execute queued conversions
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Executed count" }
+
+  /api/cron/cards:
+    get:
+      tags: [Cron]
+      summary: Process card shipping/activation updates
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Updated count" }
+
+  /api/cron/health-transactions:
+    get:
+      tags: [Cron]
+      summary: Process pending health transaction settlements
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Settled count" }
+
+  /api/cron/bills:
+    post:
+      tags: [Cron]
+      summary: Process scheduled bill payments
+      security: [{ cronAuth: [] }]
+      responses:
+        "200": { description: "Processed count" }

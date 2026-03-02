@@ -13,6 +13,7 @@ import { verifyTotpCode } from "@/lib/totp";
 import { decrypt } from "@/lib/crypto";
 import { compare } from "bcryptjs";
 import { assertAdminPasswordEnv } from "@/lib/env";
+import { logger } from "@/lib/logger";
 
 function isSixDigitCode(value: string) {
   return /^\d{6}$/.test(value);
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
     const expectedHash = process.env.ADMIN_PASSWORD_HASH;
     const expectedPlain = process.env.ADMIN_PASSWORD;
     if (!expectedHash && !expectedPlain) {
-      console.error("ADMIN_PASSWORD_HASH/ADMIN_PASSWORD env var is not set!");
+      logger.error("ADMIN_PASSWORD_HASH/ADMIN_PASSWORD env var is not set");
       return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
     }
 
@@ -93,7 +94,7 @@ export async function POST(request: Request) {
       isPasswordValid = await compare(password, expectedHash);
     } else if (process.env.NODE_ENV !== "production" && expectedPlain) {
       isPasswordValid = password === expectedPlain;
-      console.warn("⚠️ Using ADMIN_PASSWORD plaintext fallback in non-production; prefer ADMIN_PASSWORD_HASH");
+      logger.warn("Using ADMIN_PASSWORD plaintext fallback in non-production; prefer ADMIN_PASSWORD_HASH");
     }
 
     if (!isPasswordValid) {
@@ -154,7 +155,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
-    console.error("Admin login error:", err);
+    logger.error("Admin login error", { err });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

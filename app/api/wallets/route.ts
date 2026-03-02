@@ -2,22 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { createWallet } from "@/lib/ledger";
-
-function normalizeNonEmptyString(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const normalized = value.trim();
-  return normalized ? normalized : null;
-}
-
-function parsePositiveChainId(value: unknown): number | null {
-  const parsed = typeof value === "number" ? Math.trunc(value) : Number.parseInt(String(value), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return null;
-  }
-  return parsed;
-}
+import { normalizeNonEmptyString, parseChainId } from "@/lib/validators";
 
 /**
  * GET /api/wallets — get the current user's wallet
@@ -59,7 +44,7 @@ export async function POST(request: Request) {
     };
 
     const normalizedSmartAccountAddress = normalizeNonEmptyString(smartAccountAddress);
-    const normalizedChainId = parsePositiveChainId(chainId);
+    const normalizedChainId = parseChainId(chainId);
 
     if (!normalizedSmartAccountAddress || !normalizedChainId) {
       return NextResponse.json(

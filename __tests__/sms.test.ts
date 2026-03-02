@@ -47,24 +47,24 @@ describe("SMS Service Unit Tests", () => {
       const result = await sendSms({ to: "+12345678901", body: "Hello from tests" });
       expect(result.success).toBe(true);
       expect(result.provider).toBeDefined();
-    });
+    }, 10000);
   });
 
   describe("sendAccountStatusSms", () => {
     test("sends APPROVED message", async () => {
       const result = await sendAccountStatusSms("+12345678901", "APPROVED");
       expect(result.success).toBe(true);
-    });
+    }, 10000);
 
     test("sends REJECTED message", async () => {
       const result = await sendAccountStatusSms("+12345678901", "REJECTED");
       expect(result.success).toBe(true);
-    });
+    }, 10000);
 
     test("sends SUSPENDED message", async () => {
       const result = await sendAccountStatusSms("+12345678901", "SUSPENDED");
       expect(result.success).toBe(true);
-    });
+    }, 10000);
 
     test("sends RESTORED message", async () => {
       const result = await sendAccountStatusSms("+12345678901", "RESTORED");
@@ -102,11 +102,11 @@ describe("SMS Service Unit Tests", () => {
     test("sends generic notification with detail", async () => {
       const result = await sendNotificationSms("+12345678901", "PAYMENT_RECEIVED", "50 USDC from 0x123");
       expect(result.success).toBe(true);
-    });
+    }, 10000);
 
     test("sends generic notification without detail", async () => {
       const result = await sendNotificationSms("+12345678901", "CARD_ACTIVATED");
       expect(result.success).toBe(true);
-    });
+    }, 10000);
   });
 });

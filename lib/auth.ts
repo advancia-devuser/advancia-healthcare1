@@ -2,6 +2,7 @@ import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db";
 import { assertRedisRestEnvPair } from "@/lib/env";
+import { logger } from "@/lib/logger";
 
 assertRedisRestEnvPair();
 
@@ -111,7 +112,7 @@ if (!ADMIN_JWT_SECRET && typeof window === "undefined") {
   if (process.env.NODE_ENV === "production") {
     throw new Error("ADMIN_JWT_SECRET is required in production");
   }
-  console.warn("⚠️ ADMIN_JWT_SECRET not set — using dev-only fallback secret");
+  logger.warn("ADMIN_JWT_SECRET not set — using dev-only fallback secret");
 }
 const ADMIN_SECRET = new TextEncoder().encode(
   ADMIN_JWT_SECRET || "dev-only-admin-secret-never-use-in-prod"
@@ -122,7 +123,7 @@ if (!USER_JWT_SECRET && typeof window === "undefined") {
   if (process.env.NODE_ENV === "production") {
     throw new Error("USER_JWT_SECRET is required in production");
   }
-  console.warn("⚠️ USER_JWT_SECRET not set — using dev-only fallback secret");
+  logger.warn("USER_JWT_SECRET not set — using dev-only fallback secret");
 }
 const USER_SECRET = new TextEncoder().encode(
   USER_JWT_SECRET || "dev-only-user-secret-never-use-in-prod"

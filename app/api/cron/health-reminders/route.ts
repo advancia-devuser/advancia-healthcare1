@@ -12,6 +12,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { sendHealthReminderEmail } from "@/lib/email";
 import { sendHealthReminderSms } from "@/lib/sms";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -70,7 +71,7 @@ export async function GET(request: Request) {
             reminder.user.email,
             `Health Reminder: ${reminder.type}`,
             reminder.message
-          ).catch((err) => console.error("[EMAIL] Health reminder email failed:", err));
+          ).catch((err) => logger.error("Health reminder email failed", { err }));
         }
 
         // Send SMS if user has a phone number
@@ -79,12 +80,12 @@ export async function GET(request: Request) {
             reminder.user.phone,
             reminder.type,
             reminder.message
-          ).catch((err) => console.error("[SMS] Health reminder SMS failed:", err));
+          ).catch((err) => logger.error("Health reminder SMS failed", { err }));
         }
 
         results.sent++;
       } catch (err) {
-        console.error(`Failed to process reminder ${reminder.id}:`, err);
+        logger.error("Failed to process reminder", { reminderId: reminder.id, err });
         results.errors++;
       }
     }
@@ -95,7 +96,7 @@ export async function GET(request: Request) {
       ...results,
     });
   } catch (e) {
-    console.error("Health reminder agent error:", e);
+    logger.error("Health reminder agent error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json(
       { ok: false, error: "Internal error", ...results },
       { status: 500 }

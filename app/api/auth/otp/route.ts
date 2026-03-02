@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendOtp, verifyOtp, cleanupExpiredOtps, type OtpPurpose } from "@/lib/esim-otp";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 /* ─── POST: Send OTP ─── */
 
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
       message: `OTP sent to ${result.maskedPhone}`,
     });
   } catch (err: any) {
-    console.error("[OTP SEND ERROR]", err);
+    logger.error("OTP send failed", { err });
     return NextResponse.json(
       { error: "Failed to send OTP" },
       { status: 500 }
@@ -98,7 +99,7 @@ export async function PATCH(req: NextRequest) {
       message: "OTP verified successfully.",
     });
   } catch (err: any) {
-    console.error("[OTP VERIFY ERROR]", err);
+    logger.error("OTP verify failed", { err });
     return NextResponse.json(
       { error: "Failed to verify OTP" },
       { status: 500 }
@@ -117,7 +118,7 @@ export async function DELETE() {
       message: `Cleaned up ${deleted} expired OTP records`,
     });
   } catch (err: any) {
-    console.error("[OTP CLEANUP ERROR]", err);
+    logger.error("OTP cleanup failed", { err });
     return NextResponse.json(
       { error: "Failed to cleanup OTPs" },
       { status: 500 }

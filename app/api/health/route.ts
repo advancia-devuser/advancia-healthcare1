@@ -1,12 +1,16 @@
 /**
  * Health Check Endpoint
  * ─────────────────────
- * GET /api/health → { status: "ok", timestamp, uptime }
+ * GET /api/health → { status: "ok", timestamp, uptime, db }
  *
  * Used by Nginx / Docker / cloud load balancers for liveness probes.
+ * Includes a lightweight DB connectivity check so that load balancers
+ * can detect and route around database outages.
  */
 
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export async function GET() {
   const deployment = Object.fromEntries(
@@ -22,10 +26,31 @@ export async function GET() {
     }).filter(([, value]) => Boolean(value))
   );
 
-  return NextResponse.json({
-    status: "ok",
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    deployment: Object.keys(deployment).length ? deployment : undefined,
-  });
+  // Lightweight DB connectivity check — SELECT 1
+  let dbStatus: "ok" | "error" = "ok";
+  let dbLatencyMs: number | undefined;
+  try {
+    const start = Date.now();
+    await prisma.$queryRawUnsafe("SELECT 1");
+    dbLatencyMs = Date.now() - start;
+  } catch (err) {
+    dbStatus = "error";
+    logger.error("Health check: DB unreachable", {
+      err: err instanceof Error ? err : { message: String(err) },
+    });
+  }
+
+  const overallStatus = dbStatus === "ok" ? "ok" : "degraded";
+  const statusCode = overallStatus === "ok" ? 200 : 503;
+
+  return NextResponse.json(
+    {
+      status: overallStatus,
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      db: { status: dbStatus, latencyMs: dbLatencyMs },
+      deployment: Object.keys(deployment).length ? deployment : undefined,
+    },
+    { status: statusCode }
+  );
 }

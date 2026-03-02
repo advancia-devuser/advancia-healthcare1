@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { debitWallet, creditWallet } from "@/lib/ledger";
+import { normalizeNonEmptyString, parsePositiveInt as parsePositiveInteger, parseChainId, normalizePositiveAmount } from "@/lib/validators";
 
 type QuotePayload = {
   toAmount: string;
@@ -9,47 +10,6 @@ type QuotePayload = {
   fee: string | number;
   source: string;
 };
-
-function normalizeNonEmptyString(value: unknown): string | null {
-  if (typeof value !== "string") {
-    return null;
-  }
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-function parsePositiveInteger(value: string | null, fallback: number): number {
-  if (!value) {
-    return fallback;
-  }
-  const parsed = Number.parseInt(value, 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return fallback;
-  }
-  return parsed;
-}
-
-function parseChainId(value: unknown): number | null {
-  const parsed = typeof value === "number" ? Math.trunc(value) : Number.parseInt(String(value), 10);
-  if (!Number.isFinite(parsed) || parsed <= 0) {
-    return null;
-  }
-  return parsed;
-}
-
-function normalizePositiveAmount(value: unknown): string | null {
-  if (value === undefined || value === null) {
-    return null;
-  }
-  const raw = typeof value === "string" ? value.trim() : String(value);
-  if (!/^\d+$/.test(raw)) {
-    return null;
-  }
-  if (BigInt(raw) <= BigInt(0)) {
-    return null;
-  }
-  return raw;
-}
 
 function parseQuotePayload(data: unknown): QuotePayload | null {
   if (!data || typeof data !== "object" || !("quote" in data)) {

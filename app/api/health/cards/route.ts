@@ -11,6 +11,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireApprovedUser } from "@/lib/auth";
 import { encryptJSON, decryptJSON } from "@/lib/crypto";
+import { logger } from "@/lib/logger";
 
 const VALID_CARD_TYPES = ["INSURANCE", "VACCINATION", "PRESCRIPTION"] as const;
 const VALID_CARD_STATUSES = ["ACTIVE", "EXPIRED", "INACTIVE"] as const;
@@ -53,6 +54,12 @@ function parseOptionalDate(value: unknown): Date | null | undefined {
     return undefined;
   }
   return parsed;
+}
+
+function parsePositiveInteger(value: string | null, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
 function parseCardData(value: unknown): Record<string, unknown> | null {
@@ -98,14 +105,22 @@ export async function GET(request: Request) {
       );
     }
 
+    const page = parsePositiveInteger(searchParams.get("page"), 1);
+    const limit = Math.min(100, parsePositiveInteger(searchParams.get("limit"), 20));
+
     const where: Record<string, unknown> = { userId: user.id };
     if (normalizedStatus) where.status = normalizedStatus;
     if (normalizedCardType) where.cardType = normalizedCardType;
 
-    const cards = await prisma.healthCard.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-    });
+    const [cards, total] = await Promise.all([
+      prisma.healthCard.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.healthCard.count({ where }),
+    ]);
 
     // Decrypt card data for response
     const decryptedCards = cards.map((card) => {
@@ -137,10 +152,10 @@ export async function GET(request: Request) {
       },
     });
 
-    return NextResponse.json({ cards: decryptedCards });
+    return NextResponse.json({ cards: decryptedCards, total, page, limit });
   } catch (e) {
     if (e instanceof Response) return e;
-    console.error("Health cards GET error:", e);
+    logger.error("Health cards GET error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
@@ -232,7 +247,7 @@ export async function POST(request: Request) {
     );
   } catch (e) {
     if (e instanceof Response) return e;
-    console.error("Health cards POST error:", e);
+    logger.error("Health cards POST error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
@@ -357,7 +372,7 @@ export async function PATCH(request: Request) {
     });
   } catch (e) {
     if (e instanceof Response) return e;
-    console.error("Health cards PATCH error:", e);
+    logger.error("Health cards PATCH error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
@@ -408,7 +423,7 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ success: true });
   } catch (e) {
     if (e instanceof Response) return e;
-    console.error("Health cards DELETE error:", e);
+    logger.error("Health cards DELETE error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

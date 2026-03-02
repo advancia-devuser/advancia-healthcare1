@@ -73,6 +73,45 @@ describe("Admin Stats API", () => {
     expect(body.paymentRequests).toEqual({ total: 22, pending: 4, paid: 17 });
   });
 
+  test("GET includes user details in recent transactions", async () => {
+    const mockTx = {
+      id: "t1",
+      user: { address: "0x123", email: "user@example.com" },
+    };
+    (prisma.transaction.findMany as unknown as jest.Mock).mockResolvedValue([mockTx]);
+
+    const res = await GET();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.recentTransactions[0].user).toEqual({
+      address: "0x123",
+      email: "user@example.com",
+    });
+    expect(prisma.transaction.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        include: { user: { select: { address: true, email: true } } },
+      })
+    );
+  });
+
+  test("GET handles empty result sets for stats", async () => {
+    (prisma.user.count as unknown as jest.Mock).mockResolvedValue(0);
+    (prisma.transaction.count as unknown as jest.Mock).mockResolvedValue(0);
+    (prisma.withdrawal.count as unknown as jest.Mock).mockResolvedValue(0);
+    (prisma.cardRequest.count as unknown as jest.Mock).mockResolvedValue(0);
+    (prisma.transaction.findMany as unknown as jest.Mock).mockResolvedValue([]);
+    (prisma.paymentRequest.count as unknown as jest.Mock).mockResolvedValue(0);
+
+    const res = await GET();
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.totalUsers).toBe(0);
+    expect(body.recentTransactions).toEqual([]);
+    expect(body.paymentRequests.total).toBe(0);
+  });
+
   test("GET returns 500 on query failure", async () => {
     (prisma.user.count as unknown as jest.Mock).mockRejectedValue(new Error("db error"));
 

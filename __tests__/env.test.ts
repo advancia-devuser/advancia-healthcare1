@@ -34,12 +34,13 @@ describe("Environment validation helpers", () => {
 
     test("warns in non-production when both admin password envs are missing", () => {
       process.env = { ...process.env, NODE_ENV: "development" };
-      const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      // Logger emits warnings via console.log in dev mode (coloured prefix)
+      const logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
 
       expect(() => assertAdminPasswordEnv()).not.toThrow();
-      expect(warnSpy).toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalled();
 
-      warnSpy.mockRestore();
+      logSpy.mockRestore();
     });
   });
 
@@ -56,12 +57,13 @@ describe("Environment validation helpers", () => {
     test("warns in development when pair is incomplete", () => {
       process.env = { ...process.env, NODE_ENV: "development" };
       process.env.REDIS_REST_TOKEN = "token-only";
-      const warnSpy = jest.spyOn(console, "warn").mockImplementation(() => undefined);
+      // Logger emits warnings via console.log in dev mode (coloured prefix)
+      const logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
 
       expect(() => assertRedisRestEnvPair()).not.toThrow();
-      expect(warnSpy).toHaveBeenCalled();
+      expect(logSpy).toHaveBeenCalled();
 
-      warnSpy.mockRestore();
+      logSpy.mockRestore();
     });
 
     test("does not throw when both REDIS_REST_URL and REDIS_REST_TOKEN are set", () => {

@@ -13,6 +13,7 @@ import { prisma } from "@/lib/db";
 import { requireApprovedUser } from "@/lib/auth";
 import { encrypt, decrypt } from "@/lib/crypto";
 import { generateTotpSecret, verifyTotpCode, generateTotpUri } from "@/lib/totp";
+import { logger } from "@/lib/logger";
 
 function normalizeNonEmptyString(value: unknown): string | null {
   if (typeof value !== "string") {
@@ -197,7 +198,7 @@ export async function POST(request: Request) {
     );
   } catch (e) {
     if (e instanceof Response) return e;
-    console.error("2FA error:", e);
+    logger.error("2FA error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

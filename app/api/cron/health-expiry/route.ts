@@ -10,6 +10,7 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -81,7 +82,7 @@ export async function GET(request: Request) {
 
         results.expired++;
       } catch (err) {
-        console.error(`Failed to process expired card ${card.id}:`, err);
+        logger.error("Failed to process expired card", { cardId: card.id, err });
         results.errors++;
       }
     }
@@ -140,7 +141,7 @@ export async function GET(request: Request) {
 
         results.expiringSoon++;
       } catch (err) {
-        console.error(`Failed to process expiring card ${card.id}:`, err);
+        logger.error("Failed to process expiring card", { cardId: card.id, err });
         results.errors++;
       }
     }
@@ -153,7 +154,7 @@ export async function GET(request: Request) {
       ...results,
     });
   } catch (e) {
-    console.error("Health card expiry checker error:", e);
+    logger.error("Health card expiry checker error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json(
       { ok: false, error: "Internal error", ...results },
       { status: 500 }

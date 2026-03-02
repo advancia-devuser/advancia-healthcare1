@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma as db } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 // This endpoint should be called by a cron job (e.g., Vercel Cron) daily
 export async function GET(req: Request) {
@@ -140,7 +141,7 @@ export async function GET(req: Request) {
       results,
     });
   } catch (error: any) {
-    console.error("Cron error:", error);
+    logger.error("Installments cron error", { err: error instanceof Error ? error : String(error) });
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

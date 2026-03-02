@@ -11,6 +11,7 @@ jest.mock("@/lib/db", () => ({
   prisma: {
     giftCard: {
       findMany: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
       create: jest.fn(),
       findFirst: jest.fn(),
       update: jest.fn(),

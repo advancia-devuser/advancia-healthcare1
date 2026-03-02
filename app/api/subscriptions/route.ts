@@ -56,20 +56,36 @@ function normalizeSubscriptionAction(value: unknown): SubscriptionAction | null 
     : null;
 }
 
+function parsePositiveInteger(value: string | null, fallback: number): number {
+  if (!value) return fallback;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
 /**
- * GET /api/subscriptions
- * Returns user's subscriptions.
+ * GET /api/subscriptions?page=1&limit=20
+ * Returns user's subscriptions (paginated).
  */
 export async function GET(request: Request) {
   try {
     const user = await requireApprovedUser(request);
+    const { searchParams } = new URL(request.url);
+    const page = parsePositiveInteger(searchParams.get("page"), 1);
+    const limit = Math.min(100, parsePositiveInteger(searchParams.get("limit"), 20));
 
-    const subscriptions = await prisma.subscription.findMany({
-      where: { userId: user.id },
-      orderBy: { createdAt: "desc" },
-    });
+    const where = { userId: user.id };
 
-    return NextResponse.json({ subscriptions });
+    const [subscriptions, total] = await Promise.all([
+      prisma.subscription.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      prisma.subscription.count({ where }),
+    ]);
+
+    return NextResponse.json({ subscriptions, total, page, limit });
   } catch (res) {
     if (res instanceof Response) return res;
     return NextResponse.json({ error: "Server error" }, { status: 500 });

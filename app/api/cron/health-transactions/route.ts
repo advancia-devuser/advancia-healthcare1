@@ -12,6 +12,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { debitWallet } from "@/lib/ledger";
+import { logger } from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -114,7 +115,7 @@ export async function GET(request: Request) {
 
         results.completed++;
       } catch (err) {
-        console.error(`Failed to process health tx ${tx.id}:`, err);
+        logger.error("Failed to process health transaction", { txId: tx.id, err });
 
         // Check retry count (if it's been pending too long, mark failed)
         const ageMs = now.getTime() - tx.createdAt.getTime();
@@ -146,7 +147,7 @@ export async function GET(request: Request) {
       ...results,
     });
   } catch (e) {
-    console.error("Health transaction processor error:", e);
+    logger.error("Health transaction processor error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json(
       { ok: false, error: "Internal error", ...results },
       { status: 500 }

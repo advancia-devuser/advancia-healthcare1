@@ -10,6 +10,7 @@ import { prisma } from "@/lib/db";
 import { requireApprovedUser } from "@/lib/auth";
 import { debitWallet } from "@/lib/ledger";
 import { HealthTransactionStatus } from "@prisma/client";
+import { logger } from "@/lib/logger";
 
 const HEALTH_TRANSACTION_STATUSES = new Set<HealthTransactionStatus>([
   HealthTransactionStatus.PENDING,
@@ -112,7 +113,7 @@ export async function GET(request: Request) {
     });
   } catch (e) {
     if (e instanceof Response) return e;
-    console.error("Health transactions GET error:", e);
+    logger.error("Health transactions GET error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }
@@ -262,7 +263,7 @@ export async function POST(request: Request) {
     }
   } catch (e) {
     if (e instanceof Response) return e;
-    console.error("Health transactions POST error:", e);
+    logger.error("Health transactions POST error", { err: e instanceof Error ? e : String(e) });
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
   }
 }

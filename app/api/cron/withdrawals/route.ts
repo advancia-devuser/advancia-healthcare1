@@ -18,6 +18,16 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { debitWallet, creditWallet } from "@/lib/ledger";
+import {
+  createWalletClient,
+  createPublicClient,
+  http,
+  parseEther,
+  type Hex,
+} from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import type { Chain } from "viem";
+import { arbitrumSepolia, baseSepolia, sepolia } from "viem/chains";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +37,56 @@ const CHAIN_RPC: Record<number, string> = {
   84532: `https://base-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
   11155111: `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
 };
+
+/* ─── Viem chain objects per chain ID ─── */
+const VIEM_CHAINS: Record<number, Chain> = {
+  421614: arbitrumSepolia,
+  84532: baseSepolia,
+  11155111: sepolia,
+};
+
+/**
+ * Send an on-chain transfer using viem with the hot wallet.
+ * Returns the transaction hash.
+ */
+async function sendOnChainTransfer(params: {
+  privateKey: Hex;
+  toAddress: Hex;
+  amount: string; // wei string
+  chainId: number;
+}): Promise<string> {
+  const { privateKey, toAddress, amount, chainId } = params;
+  const chain = VIEM_CHAINS[chainId];
+  const rpcUrl = CHAIN_RPC[chainId];
+
+  if (!chain || !rpcUrl) {
+    throw new Error(`Unsupported chain ID for withdrawal: ${chainId}`);
+  }
+
+  const account = privateKeyToAccount(privateKey);
+
+  const walletClient = createWalletClient({
+    account,
+    chain,
+    transport: http(rpcUrl),
+  });
+
+  const publicClient = createPublicClient({
+    chain,
+    transport: http(rpcUrl),
+  });
+
+  // Send the transaction
+  const hash = await walletClient.sendTransaction({
+    to: toAddress,
+    value: BigInt(amount),
+  });
+
+  // Wait for confirmation (1 block)
+  await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
+
+  return hash;
+}
 
 export async function GET(req: Request) {
   try {
@@ -90,17 +150,18 @@ export async function GET(req: Request) {
         });
 
         // Step 2: Broadcast on-chain
-        // In production, this would use ethers.js / viem with a hot wallet
-        // For now, we simulate — replace with real signing when PRIVATE_KEY is set
         let txHash: string;
 
         if (process.env.HOT_WALLET_PRIVATE_KEY) {
-          // TODO: Real signing with viem/ethers
-          // const client = createWalletClient(...)
-          // txHash = await client.sendTransaction(...)
-          txHash = `0x${Date.now().toString(16)}${Math.random().toString(16).slice(2, 10)}`;
+          // Real on-chain signing with viem
+          txHash = await sendOnChainTransfer({
+            privateKey: process.env.HOT_WALLET_PRIVATE_KEY as Hex,
+            toAddress: withdrawal.toAddress as Hex,
+            amount: withdrawal.amount,
+            chainId: withdrawal.chainId,
+          });
         } else {
-          // Simulated hash for dev/test
+          // Simulated hash for dev/test (no hot wallet configured)
           txHash = `sim-withdrawal-${withdrawal.id}-${Date.now()}`;
         }
 

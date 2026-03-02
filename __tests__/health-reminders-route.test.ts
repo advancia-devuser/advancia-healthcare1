@@ -10,6 +10,7 @@ jest.mock("@/lib/db", () => ({
   prisma: {
     healthReminder: {
       findMany: jest.fn(),
+      count: jest.fn().mockResolvedValue(0),
       groupBy: jest.fn(),
       create: jest.fn(),
       findFirst: jest.fn(),
