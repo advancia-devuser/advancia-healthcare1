@@ -22,11 +22,11 @@ Include the following in your report:
 
 ### What to expect
 
-| Timeline            | Action                                              |
-| ------------------- | --------------------------------------------------- |
-| Within 48 hours     | Acknowledgement of your report                       |
-| Within 7 days       | Initial assessment and severity classification       |
-| Within 30 days      | Fix deployed or mitigation plan communicated         |
+| Timeline         | Action                                         |
+| ---------------- | ---------------------------------------------- |
+| Within 48 hours  | Acknowledgement of your report                 |
+| Within 7 days    | Initial assessment and severity classification |
+| Within 30 days   | Fix deployed or mitigation plan communicated   |
 
 We follow responsible disclosure. If the vulnerability is accepted, we will:
 

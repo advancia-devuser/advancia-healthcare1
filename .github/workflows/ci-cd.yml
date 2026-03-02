@@ -128,7 +128,7 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production
+    environment: "production"
     
     steps:
       - name: Checkout code
