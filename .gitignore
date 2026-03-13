@@ -46,6 +46,7 @@ jest-*.txt
 vercel_output.txt
 build-output.txt
 *.log
+audit-low.json
 
 # IDEs
 .idea/
