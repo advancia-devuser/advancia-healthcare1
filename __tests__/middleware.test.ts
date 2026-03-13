@@ -10,6 +10,7 @@
 const mockNextResponseJson = jest.fn();
 const mockNextResponseNext = jest.fn();
 const mockNextResponseRewrite = jest.fn();
+const mockNextResponseRedirect = jest.fn();
 
 jest.mock("next/server", () => {
   class FakeHeaders {
@@ -39,9 +40,15 @@ jest.mock("next/server", () => {
         mockNextResponseRewrite(res);
         return res;
       },
+      redirect: (url: any, status?: number) => {
+        const headers = new FakeHeaders();
+        const res = { headers, type: "redirect", url, status };
+        mockNextResponseRedirect(res);
+        return res;
+      },
     },
   };
-});
+}, { virtual: true });
 
 // Mock crypto.randomUUID (used in middleware)
 const originalCrypto = globalThis.crypto;
@@ -56,14 +63,20 @@ afterAll(() => {
 });
 
 // Helper to make a fake NextRequest-like object
-function fakeRequest(pathname: string, headers: Record<string, string> = {}): any {
+function fakeRequest(
+  pathname: string,
+  headers: Record<string, string> = {},
+  origin = "http://localhost:3000"
+): any {
   const headerMap = new Map(Object.entries(headers).map(([k, v]) => [k.toLowerCase(), v]));
   return {
     nextUrl: {
       pathname,
+      hostname: new URL(origin).hostname,
       clone() {
-        return { pathname, toString: () => `http://localhost:3000${pathname}` };
+        return { pathname, toString: () => `${origin}${pathname}` };
       },
+      toString: () => `${origin}${pathname}`,
     },
     headers: {
       get: (key: string) => headerMap.get(key.toLowerCase()) ?? null,
@@ -81,6 +94,7 @@ describe("middleware", () => {
     mockNextResponseJson.mockClear();
     mockNextResponseNext.mockClear();
     mockNextResponseRewrite.mockClear();
+    mockNextResponseRedirect.mockClear();
   });
   afterAll(() => { process.env = OLD_ENV; });
 
@@ -90,6 +104,36 @@ describe("middleware", () => {
   }
 
   // ── Cron gating ───────────────────────────────
+  it("permanently redirects advanciapayroll.com to advanciapayledger.com", () => {
+    delete process.env.CRON_SECRET;
+    const mw = loadMiddleware();
+    const req = fakeRequest(
+      "/dashboard?tab=overview",
+      { host: "advanciapayroll.com" },
+      "https://advanciapayroll.com"
+    );
+
+    const res = mw(req);
+    expect(res.type).toBe("redirect");
+    expect(res.status).toBe(308);
+    expect(res.url.toString()).toBe("https://advanciapayledger.com/dashboard?tab=overview");
+  });
+
+  it("permanently redirects www.advanciapayroll.com to advanciapayledger.com", () => {
+    delete process.env.CRON_SECRET;
+    const mw = loadMiddleware();
+    const req = fakeRequest(
+      "/robots.txt",
+      { host: "www.advanciapayroll.com" },
+      "https://www.advanciapayroll.com"
+    );
+
+    const res = mw(req);
+    expect(res.type).toBe("redirect");
+    expect(res.status).toBe(308);
+    expect(res.url.toString()).toBe("https://advanciapayledger.com/robots.txt");
+  });
+
   it("blocks cron routes without valid CRON_SECRET", () => {
     process.env.CRON_SECRET = "secret123";
     const mw = loadMiddleware();
@@ -167,6 +211,8 @@ describe("middleware", () => {
     expect(config).toBeDefined();
     expect(Array.isArray(config.matcher)).toBe(true);
     expect(config.matcher.length).toBeGreaterThan(0);
+    expect(config.matcher).toContain("/robots.txt");
+    expect(config.matcher).toContain("/sitemap.xml");
   });
 
   // ── Auth rate limiting ────────────────────────

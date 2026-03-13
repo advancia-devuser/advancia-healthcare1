@@ -11,6 +11,12 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
+const PAYROLL_REDIRECT_HOSTS = new Set([
+  "advanciapayroll.com",
+  "www.advanciapayroll.com",
+]);
+const PAYROLL_REDIRECT_TARGET = "https://advanciapayledger.com";
+
 // ─── Rate limiter (sliding window, per-IP) ───────────────────
 //  In production with multiple instances this should be backed by
 //  Redis; the in-memory approach here is a defence-in-depth layer
@@ -45,6 +51,17 @@ function getClientIp(req: NextRequest): string {
     req.headers.get("x-real-ip") ||
     "unknown"
   );
+}
+
+function getRequestHost(req: NextRequest): string {
+  return (
+    req.headers.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+    req.headers.get("host") ||
+    req.nextUrl.hostname ||
+    ""
+  )
+    .toLowerCase()
+    .replace(/:\d+$/, "");
 }
 
 /**
@@ -111,6 +128,15 @@ function handleCronAuth(req: NextRequest): NextResponse | null {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
+  // 0. Keep the payroll domain as redirect-only  ─────────────
+  const requestHost = getRequestHost(req);
+  if (PAYROLL_REDIRECT_HOSTS.has(requestHost)) {
+    const redirectUrl = new URL(req.nextUrl.toString());
+    redirectUrl.protocol = "https:";
+    redirectUrl.host = "advanciapayledger.com";
+    return NextResponse.redirect(redirectUrl, 308);
+  }
+
   // 1. API versioning — rewrite /api/v1/* to /api/*  ─────────
   //    This lets clients adopt versioned endpoints without
   //    renaming every route file.  When v2 is introduced, add
@@ -157,9 +183,11 @@ export function middleware(req: NextRequest) {
 // Only run on API routes and page navigations — skip static assets
 export const config = {
   matcher: [
+    "/robots.txt",
+    "/sitemap.xml",
     // Match all API routes
     "/api/:path*",
     // Match page routes (exclude _next, static, favicon, etc.)
-    "/((?!_next/static|_next/image|favicon.ico|robots.txt|sitemap.xml).*)",
+    "/((?!_next/static|_next/image|favicon.ico).*)",
   ],
 };

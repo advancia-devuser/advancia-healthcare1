@@ -35,9 +35,9 @@
     "docker:down": "docker compose -f docker-compose.postgres.yml down"
   },
   "dependencies": {
-    "@account-kit/core": "^4.84.1",
-    "@account-kit/infra": "^4.84.1",
-    "@account-kit/react": "^4.84.1",
+    "@account-kit/core": "^4.86.0",
+    "@account-kit/infra": "^4.86.0",
+    "@account-kit/react": "^4.86.0",
     "@prisma/client": "^6.4.1",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-tooltip": "^1.2.7",
@@ -78,7 +78,28 @@
   },
   "overrides": {
     "@base-org/account": "2.5.2",
-    "hono": "^4.12.2",
+    "hono": "4.12.7",
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "10.2.4"
+    },
+    "@eslint/config-array": {
+      "minimatch": "3.1.4"
+    },
+    "@eslint/eslintrc": {
+      "minimatch": "3.1.4"
+    },
+    "glob": {
+      "minimatch": "3.1.4"
+    },
+    "@walletconnect/core": "2.23.8",
+    "@walletconnect/sign-client": "2.23.8",
+    "@walletconnect/types": "2.23.8",
+    "@walletconnect/universal-provider": "2.23.8",
+    "@walletconnect/utils": "2.23.8",
+    "lodash": "4.17.23",
+    "test-exclude": {
+      "minimatch": "3.1.4"
+    },
     "@tanstack/form-core": "^0.42.1",
     "@tanstack/react-form": "^0.42.1",
     "@tanstack/zod-form-adapter": "^0.42.1"

@@ -1,5 +1,9 @@
 # Smart Wallets Quickstart (Next.js)
 
+> Canonical production repo for `advanciapayledger.com` and `advancia-healthcare.com`: [pdtribe181-prog/modullar-advancia](https://github.com/pdtribe181-prog/modullar-advancia). This repository is a separate smart-wallet application and should not be treated as the current deploy source for the main Advancia app domains.
+>
+> Domain decision: keep `advanciapayroll.com` redirect-only to `https://advanciapayledger.com`. See [docs/PAYROLL_DOMAIN_DECISION.md](docs/PAYROLL_DOMAIN_DECISION.md).
+
 Use this template to get started with **embedded smart wallets** using [Alchemy Account Kit](https://www.alchemy.com/docs/wallets).
 
 ## ✨ Features
