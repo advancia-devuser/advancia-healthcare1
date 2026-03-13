@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { creditWallet, debitWallet } from "@/lib/ledger";
-import { TransactionType } from "@prisma/client";
+import { TransactionType } from "@/generated/prisma/client";
 
 /**
  * Admin Ledger Operations (internal balances)

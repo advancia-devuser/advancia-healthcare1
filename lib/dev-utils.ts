@@ -57,8 +57,10 @@ export async function getSystemHealth() {
  */
 export async function testDbConnection() {
   try {
-    const { PrismaClient } = await import("@prisma/client");
-    const prisma = new PrismaClient();
+    const { PrismaPg } = await import("@prisma/adapter-pg");
+    const { PrismaClient } = await import("@/generated/prisma/client");
+    const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
+    const prisma = new PrismaClient({ adapter });
     await prisma.$queryRaw`SELECT 1 as test`;
     await prisma.$disconnect();
     return { status: "connected", timestamp: new Date().toISOString() };

@@ -3,7 +3,7 @@ import { isAdminRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { sendAccountStatusEmail } from "@/lib/email";
 import { sendAccountStatusSms } from "@/lib/sms";
-import { Prisma, UserStatus } from "@prisma/client";
+import { Prisma, UserStatus } from "@/generated/prisma/client";
 import { logger } from "@/lib/logger";
 
 const USER_STATUS_VALUES = new Set<UserStatus>([

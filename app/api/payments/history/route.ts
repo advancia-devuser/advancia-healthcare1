@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { TransactionType } from "@prisma/client";
+import { TransactionType } from "@/generated/prisma/client";
 
 /**
  * GET /api/payments/history?page=1&limit=20&type=SEND|RECEIVE|all

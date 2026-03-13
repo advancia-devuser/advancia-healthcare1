@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { debitWallet } from "@/lib/ledger";
-import { SubscriptionStatus, SubscriptionTier } from "@prisma/client";
+import { SubscriptionStatus, SubscriptionTier } from "@/generated/prisma/client";
 
 type SubscriptionAction = "cancel" | "pause" | "resume";
 

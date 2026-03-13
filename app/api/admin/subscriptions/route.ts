@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { SubscriptionStatus, SubscriptionTier } from "@prisma/client";
+import { SubscriptionStatus, SubscriptionTier } from "@/generated/prisma/client";
 
 type AdminSubscriptionAction = "CANCEL" | "PAUSE" | "RESUME" | "UPGRADE";
 

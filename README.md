@@ -23,6 +23,10 @@ This quickstart is configured to run on **Arbitrum Sepolia** testnet, by default
 
 ## 🚀 Quick start
 
+Runtime note:
+
+- Use Node 20 for local development and CI parity. The repo workflows already pin Node 20, and local Windows builds under Node 24 currently fail while loading Next 15's native SWC binary.
+
 ### Scaffold a new app
 
 ```bash
@@ -60,6 +64,8 @@ Note: for production, you should [protect](https://www.alchemy.com/docs/wallets/
 ```bash
 npm run dev
 ```
+
+If you see a Next SWC error such as `next-swc.win32-x64-msvc.node is not a valid Win32 application`, switch to Node 20 and reinstall dependencies.
 
 Open [http://localhost:3000](http://localhost:3000), first **Login**, then try minting a new NFT.
 

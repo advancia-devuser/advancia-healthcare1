@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { Prisma, RequestStatus } from "@prisma/client";
+import { Prisma, RequestStatus } from "@/generated/prisma/client";
 
 const REQUEST_STATUS_VALUES = new Set<RequestStatus>([
   RequestStatus.PENDING,

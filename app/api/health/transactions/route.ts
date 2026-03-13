@@ -9,7 +9,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireApprovedUser } from "@/lib/auth";
 import { debitWallet } from "@/lib/ledger";
-import { HealthTransactionStatus } from "@prisma/client";
+import { HealthTransactionStatus } from "@/generated/prisma/client";
 import { logger } from "@/lib/logger";
 
 const HEALTH_TRANSACTION_STATUSES = new Set<HealthTransactionStatus>([

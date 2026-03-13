@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { debitWallet } from "@/lib/ledger";
-import { GiftCardStatus } from "@prisma/client";
+import { GiftCardStatus } from "@/generated/prisma/client";
 
 const GIFT_CARD_STATUSES = new Set<GiftCardStatus>([
   GiftCardStatus.ACTIVE,

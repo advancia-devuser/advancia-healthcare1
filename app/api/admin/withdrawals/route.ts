@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { sendWithdrawalEmail } from "@/lib/email";
 import { sendWithdrawalSms } from "@/lib/sms";
 import { debitWallet } from "@/lib/ledger";
-import { RequestStatus } from "@prisma/client";
+import { RequestStatus } from "@/generated/prisma/client";
 import { logger } from "@/lib/logger";
 
 const REQUEST_STATUS_VALUES = new Set<RequestStatus>([

@@ -11,7 +11,7 @@
  */
 
 import { prisma } from "@/lib/db";
-import type { TransactionType, TransactionStatus } from "@prisma/client";
+import type { TransactionType, TransactionStatus } from "@/generated/prisma/client";
 
 /* ─── Types ─── */
 

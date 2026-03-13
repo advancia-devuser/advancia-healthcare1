@@ -107,27 +107,42 @@ async function getTtlMs(key: string): Promise<number> {
   return Math.max(0, entry.expiresAt - Date.now());
 }
 
-const ADMIN_JWT_SECRET = process.env.ADMIN_JWT_SECRET;
-if (!ADMIN_JWT_SECRET && typeof window === "undefined") {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("ADMIN_JWT_SECRET is required in production");
-  }
-  logger.warn("ADMIN_JWT_SECRET not set — using dev-only fallback secret");
-}
-const ADMIN_SECRET = new TextEncoder().encode(
-  ADMIN_JWT_SECRET || "dev-only-admin-secret-never-use-in-prod"
-);
+let didWarnMissingAdminSecret = false;
+let didWarnMissingUserSecret = false;
 
-const USER_JWT_SECRET = process.env.USER_JWT_SECRET;
-if (!USER_JWT_SECRET && typeof window === "undefined") {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("USER_JWT_SECRET is required in production");
+function getAdminSecret() {
+  const adminJwtSecret = process.env.ADMIN_JWT_SECRET;
+  if (!adminJwtSecret && typeof window === "undefined") {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("ADMIN_JWT_SECRET is required in production");
+    }
+    if (!didWarnMissingAdminSecret) {
+      logger.warn("ADMIN_JWT_SECRET not set — using dev-only fallback secret");
+      didWarnMissingAdminSecret = true;
+    }
   }
-  logger.warn("USER_JWT_SECRET not set — using dev-only fallback secret");
+
+  return new TextEncoder().encode(
+    adminJwtSecret || "dev-only-admin-secret-never-use-in-prod"
+  );
 }
-const USER_SECRET = new TextEncoder().encode(
-  USER_JWT_SECRET || "dev-only-user-secret-never-use-in-prod"
-);
+
+function getUserSecret() {
+  const userJwtSecret = process.env.USER_JWT_SECRET;
+  if (!userJwtSecret && typeof window === "undefined") {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("USER_JWT_SECRET is required in production");
+    }
+    if (!didWarnMissingUserSecret) {
+      logger.warn("USER_JWT_SECRET not set — using dev-only fallback secret");
+      didWarnMissingUserSecret = true;
+    }
+  }
+
+  return new TextEncoder().encode(
+    userJwtSecret || "dev-only-user-secret-never-use-in-prod"
+  );
+}
 
 /* ──────────────────── Admin JWT helpers ──────────────────── */
 
@@ -136,12 +151,12 @@ export async function signAdminToken(extra?: Record<string, unknown>) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("8h")
-    .sign(ADMIN_SECRET);
+    .sign(getAdminSecret());
 }
 
 export async function verifyAdminToken(token: string) {
   try {
-    const { payload } = await jwtVerify(token, ADMIN_SECRET);
+    const { payload } = await jwtVerify(token, getAdminSecret());
     return payload;
   } catch {
     return null;
@@ -167,7 +182,7 @@ export async function signUserToken(userId: string, address: string) {
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("24h")
-    .sign(USER_SECRET);
+    .sign(getUserSecret());
 }
 
 /**
@@ -175,7 +190,7 @@ export async function signUserToken(userId: string, address: string) {
  */
 export async function verifyUserToken(token: string) {
   try {
-    const { payload } = await jwtVerify(token, USER_SECRET);
+    const { payload } = await jwtVerify(token, getUserSecret());
     return payload as { sub: string; address: string };
   } catch {
     return null;

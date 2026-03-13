@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { isAdminRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { InstallmentFrequency, Prisma } from "@prisma/client";
+import { InstallmentFrequency, Prisma } from "@/generated/prisma/client";
 
 const INSTALLMENT_FREQUENCY_VALUES = new Set<InstallmentFrequency>([
   InstallmentFrequency.WEEKLY,
@@ -30,7 +30,17 @@ function parseDecimal(value: unknown): Prisma.Decimal | null {
   }
 
   try {
-    return new Prisma.Decimal(value as Prisma.Decimal.Value);
+    if (
+      typeof value === "string" ||
+      typeof value === "number" ||
+      value instanceof Prisma.Decimal
+    ) {
+      return new Prisma.Decimal(value);
+    }
+    if (typeof value === "bigint") {
+      return new Prisma.Decimal(value.toString());
+    }
+    return null;
   } catch {
     return null;
   }

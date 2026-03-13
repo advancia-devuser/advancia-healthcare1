@@ -3,7 +3,7 @@ import { isAdminRequest } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { sendAccountStatusEmail } from "@/lib/email";
 import { sendAccountStatusSms } from "@/lib/sms";
-import { Prisma } from "@prisma/client";
+import { Prisma } from "@/generated/prisma/client";
 
 jest.mock("@/lib/auth", () => ({
   isAdminRequest: jest.fn(),

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApprovedUser } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { debitWallet } from "@/lib/ledger";
-import { BillPaymentStatus } from "@prisma/client";
+import { BillPaymentStatus } from "@/generated/prisma/client";
 import { normalizeNonEmptyString, parsePositiveInt as parsePositiveInteger, parseChainId, normalizePositiveAmount, parseOptionalDate } from "@/lib/validators";
 
 const BILL_PAYMENT_STATUSES = new Set<BillPaymentStatus>([

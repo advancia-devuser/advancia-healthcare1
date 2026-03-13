@@ -9,7 +9,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { requireApprovedUser } from "@/lib/auth";
-import { HealthReminderStatus } from "@prisma/client";
+import { HealthReminderStatus } from "@/generated/prisma/client";
 import { logger } from "@/lib/logger";
 
 const REMINDER_TYPES = new Set(["Appointment", "Medication", "PremiumDue"]);

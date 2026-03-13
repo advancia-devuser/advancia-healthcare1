@@ -15,6 +15,8 @@ module.exports = {
   },
   testMatch: ["<rootDir>/__tests__/**/*.test.ts"],
   moduleFileExtensions: ["ts", "tsx", "js", "jsx", "json"],
+  modulePathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/coverage/"],
+  testPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/node_modules/"],
   transformIgnorePatterns: [
     "node_modules/(?!(viem|@noble|@scure)/)",
   ],

@@ -28,23 +28,24 @@ async function checkHealth() {
 }
 
 async function checkDatabase() {
-  const { PrismaClient } = require('@prisma/client');
-  const prisma = new PrismaClient();
+  const { Client } = await import('pg');
+  const client = new Client({ connectionString: process.env.DATABASE_URL });
   
   try {
     console.log('🔍 Testing database connection...');
-    await prisma.$queryRaw`SELECT 1 as test`;
+    await client.connect();
+    await client.query('SELECT 1 as test');
     console.log('✅ Database connected successfully');
     
-    const userCount = await prisma.user.count();
-    const walletCount = await prisma.wallet.count();
+    const userCount = await client.query('SELECT COUNT(*)::int AS count FROM "User"');
+    const walletCount = await client.query('SELECT COUNT(*)::int AS count FROM "Wallet"');
     
-    console.log(`👥 Users: ${userCount}`);
-    console.log(`💳 Wallets: ${walletCount}`);
+    console.log(`👥 Users: ${userCount.rows[0]?.count ?? 0}`);
+    console.log(`💳 Wallets: ${walletCount.rows[0]?.count ?? 0}`);
   } catch (error) {
     console.log('❌ Database connection failed:', error.message);
   } finally {
-    await prisma.$disconnect();
+    await client.end().catch(() => {});
   }
 }
 
