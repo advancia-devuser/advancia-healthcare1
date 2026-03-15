@@ -15,7 +15,11 @@ const PAYROLL_REDIRECT_HOSTS = new Set([
   "advanciapayroll.com",
   "www.advanciapayroll.com",
 ]);
-const PAYROLL_REDIRECT_TARGET = "https://advanciapayledger.com";
+
+function getPayrollRedirectTarget(): string | null {
+  const value = process.env.PAYROLL_REDIRECT_TARGET?.trim();
+  return value ? value : null;
+}
 
 // ─── Rate limiter (sliding window, per-IP) ───────────────────
 //  In production with multiple instances this should be backed by
@@ -128,12 +132,14 @@ function handleCronAuth(req: NextRequest): NextResponse | null {
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // 0. Keep the payroll domain as redirect-only  ─────────────
+  // 0. Optional payroll-domain redirect  ─────────────────────
   const requestHost = getRequestHost(req);
-  if (PAYROLL_REDIRECT_HOSTS.has(requestHost)) {
+  const payrollRedirectTarget = getPayrollRedirectTarget();
+  if (payrollRedirectTarget && PAYROLL_REDIRECT_HOSTS.has(requestHost)) {
     const redirectUrl = new URL(req.nextUrl.toString());
-    redirectUrl.protocol = "https:";
-    redirectUrl.host = "advanciapayledger.com";
+    const targetUrl = new URL(payrollRedirectTarget);
+    redirectUrl.protocol = targetUrl.protocol;
+    redirectUrl.host = targetUrl.host;
     return NextResponse.redirect(redirectUrl, 308);
   }
 

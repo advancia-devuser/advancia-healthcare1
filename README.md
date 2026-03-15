@@ -2,7 +2,9 @@
 
 > Canonical production repo for `advanciapayledger.com` and `advancia-healthcare.com`: [pdtribe181-prog/modullar-advancia](https://github.com/pdtribe181-prog/modullar-advancia). This repository is a separate smart-wallet application and should not be treated as the current deploy source for the main Advancia app domains.
 >
-> Domain decision: keep `advanciapayroll.com` redirect-only to `https://advanciapayledger.com`. See [docs/PAYROLL_DOMAIN_DECISION.md](docs/PAYROLL_DOMAIN_DECISION.md).
+> Data boundary: if this repository is deployed, it must use its own Supabase/Auth/Postgres project and its own GitHub/Vercel environment variables. Do not point this repo at the canonical `modullar-advancia` production Supabase project just to reuse data or reduce setup steps.
+>
+> Domain status: `advanciapayroll.com` currently redirects to `https://advanciapayledger.com` unless you intentionally point that domain at this Vercel project. See [docs/PAYROLL_DOMAIN_DECISION.md](docs/PAYROLL_DOMAIN_DECISION.md).
 
 Use this template to get started with **embedded smart wallets** using [Alchemy Account Kit](https://www.alchemy.com/docs/wallets).
 
@@ -42,12 +44,14 @@ Once you have your keys, add them to your `.env.local` file.
 
 ```bash
 cp .env.example .env.local      # create if missing
+# add NEXT_PUBLIC_APP_URL=https://your-public-app-domain
 # add NEXT_PUBLIC_ALCHEMY_API_KEY=...
 # add NEXT_PUBLIC_ALCHEMY_POLICY_ID=...
 ```
 
 | Variable                        | Purpose                                                                                                     |
 | ------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `NEXT_PUBLIC_APP_URL`           | Public base URL used for metadata, redirects, and email links                                               |
 | `NEXT_PUBLIC_ALCHEMY_API_KEY`   | API key for your Alchemy [app](https://dashboard.alchemy.com/services/smart-wallets/configuration)          |
 | `NEXT_PUBLIC_ALCHEMY_POLICY_ID` | Gas Manager policy ID for [sponsorship](https://dashboard.alchemy.com/services/smart-wallets/configuration) |
 
@@ -107,7 +111,10 @@ npm run lint    # lint code
 
 ## 🔐 Production security notes
 
+- Keep infrastructure isolated from the canonical production app: use a dedicated Supabase project, dedicated Vercel project, and repo-specific secrets for this repository.
+- Set `NEXT_PUBLIC_APP_URL` to the real public URL for this deployment. Without it, metadata routes such as `robots.txt` and `sitemap.xml` can fall back to `http://localhost:3000`.
 - Set `ADMIN_PASSWORD_HASH` (bcrypt hash) for admin login. Plain `ADMIN_PASSWORD` is only a non-production fallback.
+- Only set `PAYROLL_REDIRECT_TARGET` if you intentionally want `advanciapayroll.com` and `www.advanciapayroll.com` to forward elsewhere. Leave it unset if this repo should serve that domain directly.
 - Generate hash with:
 
 ```bash
@@ -125,6 +132,11 @@ Post-deploy verification:
 bash scripts/post-deploy-verify.sh https://your-domain.com
 ```
 
+Alchemy webhook note:
+
+- In the Alchemy dashboard, the webhook URL field should contain only your endpoint URL, for example `https://your-domain.com/api/webhooks/alchemy`.
+- The GraphQL block filter, demo `curl` request for `alchemy_getTokenBalances`, and `node demo-script.js` example are separate testing or demo inputs. Do not paste those commands into the webhook URL field.
+
 Optional admin positive-path validation:
 
 ```bash
@@ -137,6 +149,14 @@ GitHub Actions workflow:
 - Trigger manually via `workflow_dispatch` or by `repository_dispatch` event type `post_deploy_verify`
 - Required repo variable/secret: `STAGING_URL`
 - Optional secrets for admin success-path check: `STAGING_ADMIN_PASSWORD`, `STAGING_ADMIN_TOTP`
+- Optional secret for protected Vercel deployments: `VERCEL_PROTECTION_BYPASS`
+
+Cron scheduling note:
+
+- This repo currently deploys on a Vercel Hobby account, so the high-frequency schedules that were previously defined in `vercel.json` are intentionally not managed by Vercel.
+- `/api/cron/*` endpoints still exist and still require `CRON_SECRET`, but they must be triggered by an external scheduler or a GitHub Actions workflow if you remain on Hobby.
+- If you later move this project to Vercel Pro, you can restore Vercel-managed cron schedules.
+- If the deployment URL is protected by Vercel Authentication, set `VERCEL_PROTECTION_BYPASS` in GitHub Actions so post-deploy checks can reach the protected app without making it public.
 
 Trigger `repository_dispatch` from terminal:
 

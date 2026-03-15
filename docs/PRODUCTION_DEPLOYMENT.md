@@ -1,5 +1,12 @@
 # Smart Wallets App - Production Deployment Guide
 
+## Infrastructure Boundary
+
+- This repository is a separate smart-wallet application, not the canonical live-domain source.
+- If you deploy it, use a dedicated Supabase/Auth/Postgres project for this repo.
+- Do not point this repo at the `modullar-advancia` production Supabase project just to avoid duplicate setup.
+- If the goal is one shared production backend, migrate the needed features into `modullar-advancia` instead of having two repos share one database project.
+
 ## Deployment Readiness Checklist
 
 ### Completed Prerequisites
@@ -64,6 +71,7 @@ docker run -p 3000:3000 --env-file .env smart-wallets-app
 
 | Variable | Description |
 | --- | --- |
+| `NEXT_PUBLIC_APP_URL` | Public base URL for metadata, sitemap, robots, and user-facing links |
 | `NEXT_PUBLIC_ALCHEMY_API_KEY` | Alchemy API key for blockchain access |
 | `NEXT_PUBLIC_ALCHEMY_POLICY_ID` | Gas sponsorship policy ID |
 | `NEXT_PUBLIC_CHAIN_ID` | Target chain (421614 = Arb Sepolia) |
@@ -72,7 +80,7 @@ docker run -p 3000:3000 --env-file .env smart-wallets-app
 | `ADMIN_JWT_SECRET` | JWT secret for admin authentication |
 | `ENCRYPTION_KEY` | AES encryption key (32 hex bytes) |
 | `SUPABASE_URL` | Supabase project URL |
-| `SUPABASE_ANON_KEY` | Supabase anonymous key |
+| `SUPABASE_ANON_KEY` | Supabase public browser key (anon/publishable key, depending on dashboard naming) |
 | `ALCHEMY_WEBHOOK_SECRET` | Token for Alchemy webhook verification |
 | `CRON_SECRET` | Bearer token for cron job authentication |
 
@@ -81,6 +89,12 @@ docker run -p 3000:3000 --env-file .env smart-wallets-app
 | Variable | Description |
 | --- | --- |
 | `HOT_WALLET_PRIVATE_KEY` | Private key (0x-prefixed hex) for the hot wallet that signs withdrawals. Without this, withdrawals are simulated. |
+
+Supabase note:
+
+- `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `DATABASE_URL` should all belong to the same dedicated project for this repository.
+- Do not mix a shared canonical Auth/database project with this repo's separate Vercel/GitHub deployment.
+- If you use the Supabase pooler with Node pg, prefer a connection string that includes `uselibpqcompat=true&sslmode=require` to avoid TLS verification issues in serverless runtimes.
 
 #### 4. Database Configuration
 
@@ -96,9 +110,14 @@ npm run db:generate
 
 1. Go to [Alchemy Dashboard](https://dashboard.alchemy.com/) > Notify > Webhooks
 2. Create an **Address Activity** webhook
-3. Set the webhook URL to: `https://<your-domain>/api/webhooks/alchemy`
+3. Set the webhook URL to only the endpoint URL: `https://<your-domain>/api/webhooks/alchemy`
 4. Set the **Auth Token** to match your `ALCHEMY_WEBHOOK_SECRET` env var
 5. Add your users' smart account addresses to the webhook's monitored addresses
+
+Important:
+
+- Do not paste GraphQL block filters, JSON-RPC examples such as `alchemy_getTokenBalances`, shell commands, or demo script commands into the webhook URL field.
+- Those examples are for testing Alchemy APIs separately; the webhook configuration only needs the endpoint URL and auth token.
 
 #### 6. Post-Deployment Verification
 
@@ -136,6 +155,12 @@ curl https://<your-domain>/admin
 - [x] Cron job bearer auth
 
 #### Monitoring & Cron Jobs
+
+Deployment note:
+
+- The repository no longer relies on `vercel.json` cron schedules for deployment because the linked Vercel Hobby plan rejects schedules that run more than once per day.
+- Keep `CRON_SECRET` configured and trigger these endpoints from an external scheduler or GitHub Actions if you stay on Hobby.
+- If you upgrade the Vercel project to Pro later, you can restore platform-managed cron schedules.
 
 | Cron Path | Schedule | Purpose |
 | --- | --- | --- |

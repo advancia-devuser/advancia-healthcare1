@@ -1,24 +1,24 @@
 # Payroll Domain Decision
 
-## Decision
+## Current Status
 
-`advanciapayroll.com` should remain a redirect-only domain.
+`advanciapayroll.com` is currently redirecting to `https://advanciapayledger.com`, but that is an operational choice rather than a permanent requirement in this repository.
 
 This repository is a separate smart-wallet application built on Next.js, Alchemy Account Kit, and Prisma. It is not the canonical production codebase for the main Advancia product domains.
 
-## Enforcement
+## Recommended Decision Paths
 
-- Middleware permanently redirects requests for `advanciapayroll.com` and `www.advanciapayroll.com` to `https://advanciapayledger.com`.
-- This reduces the risk of accidentally serving the wrong application on the payroll domain.
+- If `advanciapayroll.com` should continue acting as a pointer to the canonical production app, keep the redirect at the DNS/hosting layer and set `PAYROLL_REDIRECT_TARGET=https://advanciapayledger.com` in this repo only if requests can still reach this app.
+- If `advanciapayroll.com` should serve this repository directly, remove the Hostinger redirect, point the domain at this Vercel project, leave `PAYROLL_REDIRECT_TARGET` unset, and set `NEXT_PUBLIC_APP_URL=https://advanciapayroll.com`.
 
 ## Operational Guidance
 
-- Do not connect this repository to the live payroll domain as its primary application.
-- If payroll branding or payroll-specific features are needed in the future, define that as a separate product initiative first.
+- Decide whether the payroll domain belongs to the canonical app or to this separate app before changing DNS.
+- If payroll branding or payroll-specific features are needed here, treat that as a deliberate deployment decision rather than an accidental redirect artifact.
 - Continue using `pdtribe181-prog/modullar-advancia` as the canonical production source for the main Advancia app domains.
 
 ## If This Repo Is Kept
 
 - Treat it as smart-wallet R&D or a separate experimental product.
-- Use staging or internal domains only.
-- Do not split production ownership across this repo and the canonical repo.
+- Use a dedicated public or internal domain and dedicated infrastructure.
+- Do not split one production domain across this repo and the canonical repo at the same time.

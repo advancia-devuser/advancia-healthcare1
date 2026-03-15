@@ -30,6 +30,8 @@ If strict metadata enforcement is enabled:
 ## 3) Runtime configuration sanity
 
 - Repository Actions variable or secret `STAGING_URL` is set.
+- Repository Actions variable `PRODUCTION_URL` is set.
+- Repository secret `VERCEL_TOKEN` is set.
 - Required production secrets are present in target environment:
   - `DATABASE_URL`
   - `ADMIN_PASSWORD_HASH`

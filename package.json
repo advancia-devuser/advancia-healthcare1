@@ -18,6 +18,7 @@
     "hash:admin": "node scripts/generate-admin-password-hash.js",
     "trigger:post-deploy:dispatch": "bash scripts/trigger-post-deploy-verify.sh",
     "trigger:post-deploy:dispatch:ps": "pwsh -File scripts/trigger-post-deploy-verify.ps1",
+    "check:gh-actions:ps": "pwsh -File scripts/check-github-actions-readiness.ps1",
     "type-check": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",

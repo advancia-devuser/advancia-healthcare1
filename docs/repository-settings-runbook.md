@@ -34,15 +34,43 @@ Optional for governance-strict repos:
 
 ## 2) Required repository variables and secrets
 
+Infrastructure boundary for this repo:
+
+- `advancia-healthcare1` is a separate deployable app, so keep its Actions secrets and runtime env vars tied to its own Supabase/Vercel resources.
+- Do not reuse the canonical `modullar-advancia` production Supabase project in this repo's `DATABASE_URL`, `SUPABASE_URL`, or `SUPABASE_ANON_KEY`.
+- If you want one shared production backend, consolidate features into `modullar-advancia` instead of letting two repos share one production database/Auth project.
+
 ### Verify variables/secrets in ~60 seconds (UI)
 
 1. Open GitHub repo → `Settings`.
 1. Open `Secrets and variables` → `Actions`.
 1. In **Variables**, verify `STAGING_URL` exists.
+1. In **Variables**, verify `PRODUCTION_URL` exists for production health checks in `.github/workflows/ci-cd.yml`.
 1. In **Variables**, optionally set strict metadata enforcement: `LABEL_AUDIT_FAIL_ON_DRIFT=true` (or leave unset/`false` for warning-only drift reporting).
+1. In **Secrets**, verify `VERCEL_TOKEN` exists for preview and production deploy jobs.
+1. In **Secrets**, verify `DATABASE_URL` exists for production migration steps.
 1. In **Secrets**, verify either `STAGING_URL` exists or the variable above is set.
 1. In **Secrets**, verify optional admin checks if used: `STAGING_ADMIN_PASSWORD` and `STAGING_ADMIN_TOTP`.
+1. In **Secrets**, if the Vercel deployment is protected, verify `VERCEL_PROTECTION_BYPASS` exists for workflow health checks.
 1. Save any missing values, then run `Post-Deploy Verify` via `workflow_dispatch`.
+
+### Required for CI/CD deployment workflow
+
+Workflow file: `.github/workflows/ci-cd.yml`
+
+Required repository secret:
+
+- `VERCEL_TOKEN`
+- `DATABASE_URL`
+
+Required repository variable:
+
+- `PRODUCTION_URL`
+
+Notes:
+
+- `deploy-preview` uses `VERCEL_TOKEN` on pull requests.
+- `deploy-production` uses `VERCEL_TOKEN`, runs migrations with `DATABASE_URL`, and verifies health at `${{ vars.PRODUCTION_URL }}/api/health`.
 
 ### Required for post-deploy verification workflow
 
@@ -57,6 +85,7 @@ Optional (enables admin positive-path checks in the same workflow):
 
 - Repository secret: `STAGING_ADMIN_PASSWORD`
 - Repository secret: `STAGING_ADMIN_TOTP`
+- Repository secret: `VERCEL_PROTECTION_BYPASS` when the target Vercel deployment uses Deployment Protection / Vercel Authentication
 
 Optional (strict governance metadata enforcement in `.github/workflows/label-audit.yml`):
 
@@ -77,6 +106,14 @@ PowerShell equivalent:
 gh variable set LABEL_AUDIT_FAIL_ON_DRIFT --body "true" --repo advancia-devuser/advancia-healthcare1
 gh variable delete LABEL_AUDIT_FAIL_ON_DRIFT --repo advancia-devuser/advancia-healthcare1
 ```
+
+Audit the current repository setup from the local checkout:
+
+```powershell
+npm run check:gh-actions:ps
+```
+
+The script exits with code `1` when required Actions configuration is missing, and reports the exact missing repository secrets, variables, and expected environments.
 
 Manual dispatch override via GitHub CLI (`gh`):
 
@@ -99,6 +136,8 @@ Environment template: `.env.example`
 Production-critical:
 
 - `DATABASE_URL`
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY` (the project's public browser key; Supabase may label it anon or publishable)
 - `ADMIN_PASSWORD_HASH`
 - `ADMIN_JWT_SECRET`
 - `USER_JWT_SECRET`
@@ -107,6 +146,10 @@ Recommended for multi-instance correctness:
 
 - `REDIS_REST_URL`
 - `REDIS_REST_TOKEN`
+
+Database note:
+
+- For Supabase pooler URLs used with Node pg, prefer `DATABASE_URL` values that include `uselibpqcompat=true&sslmode=require`.
 
 Feature-dependent variables (set only if feature is enabled):
 
@@ -130,8 +173,12 @@ Feature-dependent variables (set only if feature is enabled):
 ## 4) One-time setup checklist
 
 - Enable branch protection for `main` using `docs/branch-protection.md`
+- Add `VERCEL_TOKEN` secret
+- Add `DATABASE_URL` secret
+- Add `PRODUCTION_URL` variable
 - Add `STAGING_URL` (variable or secret)
 - Optionally add `STAGING_ADMIN_PASSWORD` and `STAGING_ADMIN_TOTP`
+- If the deployment URL is protected by Vercel Authentication, add `VERCEL_PROTECTION_BYPASS`
 - Optionally set `LABEL_AUDIT_FAIL_ON_DRIFT=true` for fail-on-drift governance mode
 - Confirm Actions are enabled and workflows can run
 - Trigger `Dependency Audit` via `workflow_dispatch` once to validate setup
@@ -158,6 +205,18 @@ Feature-dependent variables (set only if feature is enabled):
 - Symptom: workflow logs contain `STAGING_URL is not set in repo variables or secrets`.
 - Likely cause: neither Actions variable nor secret `STAGING_URL` is configured.
 - Fix: add `STAGING_URL` in `Settings` → `Secrets and variables` → `Actions`, then rerun.
+
+### `CI/CD Pipeline` preview or production deploy fails before deployment starts
+
+- Symptom: workflow fails on `vercel pull`, `vercel build`, or `vercel deploy`.
+- Likely cause: missing or invalid `VERCEL_TOKEN` secret.
+- Fix: add a valid `VERCEL_TOKEN` in `Settings` → `Secrets and variables` → `Actions`, then rerun.
+
+### `Deploy Production` migration or health verification fails
+
+- Symptom: workflow fails during Prisma migration or on the production health check.
+- Likely cause: missing `DATABASE_URL` secret or missing `PRODUCTION_URL` repository variable.
+- Fix: add `DATABASE_URL` as a secret and `PRODUCTION_URL` as a variable, then rerun the workflow.
 
 ### Branch protection blocks merge with missing required checks
 

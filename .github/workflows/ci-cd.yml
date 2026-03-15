@@ -161,9 +161,15 @@ jobs:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Verify deployment health
+        env:
+          VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
         run: |
           sleep 10
-          HEALTH=$(curl -sf "${{ vars.PRODUCTION_URL }}/api/health" || echo '{"status":"unreachable"}')
+          URL="${{ vars.PRODUCTION_URL }}/api/health"
+          if [ -n "${VERCEL_PROTECTION_BYPASS:-}" ]; then
+            URL="${URL}?x-vercel-set-bypass-cookie=true&x-vercel-protection-bypass=${VERCEL_PROTECTION_BYPASS}"
+          fi
+          HEALTH=$(curl -sf "$URL" || echo '{"status":"unreachable"}')
           echo "Health check: $HEALTH"
           echo "$HEALTH" | grep -q '"ok"' || (echo "❌ Health check failed" && exit 1)
           echo "✅ Production deployment verified"

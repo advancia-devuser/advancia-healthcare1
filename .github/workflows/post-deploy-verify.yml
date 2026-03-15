@@ -37,6 +37,7 @@ jobs:
         env:
           ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
           ADMIN_TOTP: ${{ secrets.STAGING_ADMIN_TOTP }}
+          VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_PROTECTION_BYPASS }}
         run: |
           chmod +x scripts/post-deploy-verify.sh
           bash scripts/post-deploy-verify.sh "${{ steps.target.outputs.url }}"

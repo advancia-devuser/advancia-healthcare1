@@ -7,9 +7,11 @@ set -euo pipefail
 # Optional env vars:
 #   ADMIN_PASSWORD=...      # if set, script tests admin login invalid/valid flows
 #   ADMIN_TOTP=...          # optional 2FA code for valid admin login test
+#   VERCEL_PROTECTION_BYPASS=...  # optional bypass token for protected Vercel deployments
 
 BASE_URL="${1:-https://advanciapayledger.com}"
 API_BASE="${BASE_URL%/}/api"
+COOKIE_JAR="/tmp/advancia_verify_cookies.txt"
 
 GREEN='\033[0;32m'
 RED='\033[0;31m'
@@ -40,18 +42,42 @@ require_cmd() {
   }
 }
 
+build_url() {
+  local url="$1"
+
+  if [[ -z "${VERCEL_PROTECTION_BYPASS:-}" ]]; then
+    echo "$url"
+    return
+  fi
+
+  local separator="?"
+  if [[ "$url" == *"?"* ]]; then
+    separator="&"
+  fi
+
+  echo "${url}${separator}x-vercel-set-bypass-cookie=true&x-vercel-protection-bypass=${VERCEL_PROTECTION_BYPASS}"
+}
+
+curl_common_args() {
+  printf '%s\n' "-b" "$COOKIE_JAR" "-c" "$COOKIE_JAR"
+}
+
 http_code() {
   local method="$1"
-  local url="$2"
+  local url
+  url="$(build_url "$2")"
   local data="${3:-}"
+  mapfile -t curl_args < <(curl_common_args)
 
   if [[ -n "$data" ]]; then
     curl -sS -o /tmp/advancia_verify_body.json -w "%{http_code}" \
+      "${curl_args[@]}" \
       -X "$method" "$url" \
       -H "Content-Type: application/json" \
       --data "$data"
   else
     curl -sS -o /tmp/advancia_verify_body.json -w "%{http_code}" \
+      "${curl_args[@]}" \
       -X "$method" "$url"
   fi
 }
@@ -83,6 +109,7 @@ echo "=============================================="
 
 require_cmd curl
 require_cmd grep
+rm -f "$COOKIE_JAR"
 
 # 1) Public health endpoint
 code="$(http_code GET "${API_BASE}/health")"
@@ -96,7 +123,8 @@ code="$(http_code GET "${BASE_URL%/}/sitemap.xml")"
 expect_code "GET /sitemap.xml" "$code" 200
 
 # 3) Session nonce endpoint
-nonce_json="$(curl -sS "${API_BASE}/auth/session?address=0xabcdef1234567890abcdef1234567890abcdef12")"
+nonce_url="$(build_url "${API_BASE}/auth/session?address=0xabcdef1234567890abcdef1234567890abcdef12")"
+nonce_json="$(curl -sS -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$nonce_url")"
 if echo "$nonce_json" | grep -q '"nonce"'; then
   pass "GET /api/auth/session returns nonce"
 else
@@ -137,7 +165,7 @@ else
 fi
 
 # 9) Security headers spot check
-headers="$(curl -sSI "${BASE_URL%/}" || true)"
+headers="$(curl -sSI -b "$COOKIE_JAR" -c "$COOKIE_JAR" "$(build_url "${BASE_URL%/}")" || true)"
 if echo "$headers" | grep -qi "strict-transport-security"; then
   pass "HSTS header present"
 else

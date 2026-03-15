@@ -104,8 +104,9 @@ describe("middleware", () => {
   }
 
   // ── Cron gating ───────────────────────────────
-  it("permanently redirects advanciapayroll.com to advanciapayledger.com", () => {
+  it("does not redirect the payroll domain when PAYROLL_REDIRECT_TARGET is unset", () => {
     delete process.env.CRON_SECRET;
+    delete process.env.PAYROLL_REDIRECT_TARGET;
     const mw = loadMiddleware();
     const req = fakeRequest(
       "/dashboard?tab=overview",
@@ -114,13 +115,12 @@ describe("middleware", () => {
     );
 
     const res = mw(req);
-    expect(res.type).toBe("redirect");
-    expect(res.status).toBe(308);
-    expect(res.url.toString()).toBe("https://advanciapayledger.com/dashboard?tab=overview");
+    expect(res.type).toBe("next");
   });
 
-  it("permanently redirects www.advanciapayroll.com to advanciapayledger.com", () => {
+  it("redirects the payroll domain when PAYROLL_REDIRECT_TARGET is set", () => {
     delete process.env.CRON_SECRET;
+    process.env.PAYROLL_REDIRECT_TARGET = "https://advanciapayledger.com";
     const mw = loadMiddleware();
     const req = fakeRequest(
       "/robots.txt",

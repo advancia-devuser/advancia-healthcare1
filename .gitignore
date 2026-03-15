@@ -46,6 +46,8 @@ next-env.d.ts
 jest-*.txt
 vercel_output.txt
 build-output.txt
+build-exit.txt
+.env.vercel.snapshot
 *.log
 audit-low.json
 
