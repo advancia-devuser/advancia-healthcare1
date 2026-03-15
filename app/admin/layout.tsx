@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Link from "next/link";
 
-const ADMIN_TOKEN_KEY = "admin_authenticated";
-
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [password, setPassword] = useState("");
@@ -15,27 +13,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Check if already authenticated by trying to call a protected admin endpoint
+  // Verify the server-side admin cookie on load so access persists across tabs and refreshes.
   useEffect(() => {
-    const cached = sessionStorage.getItem(ADMIN_TOKEN_KEY);
-    if (cached === "true") {
-      // Verify the cookie is still valid
-      fetch("/api/admin/stats")
-        .then(res => {
-          if (res.ok) {
-            setIsAdmin(true);
-          } else {
-            sessionStorage.removeItem(ADMIN_TOKEN_KEY);
-            setIsAdmin(false);
-          }
-        })
-        .catch(() => {
-          sessionStorage.removeItem(ADMIN_TOKEN_KEY);
-          setIsAdmin(false);
-        });
-    } else {
-      setIsAdmin(false);
-    }
+    fetch("/api/admin/stats", { credentials: "include" })
+      .then(res => {
+        setIsAdmin(res.ok);
+      })
+      .catch(() => {
+        setIsAdmin(false);
+      });
   }, []);
 
   const handleLogin = async () => {
@@ -49,7 +35,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       });
       const data = await res.json();
       if (res.ok) {
-        sessionStorage.setItem(ADMIN_TOKEN_KEY, "true");
         setIsAdmin(true);
       } else {
         setError(data.error || "Invalid credentials. Access denied.");
@@ -65,7 +50,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const handleLogout = async () => {
     // Clear the httpOnly cookie by calling logout or just expire it
     await fetch("/api/admin/login", { method: "DELETE" }).catch(() => {});
-    sessionStorage.removeItem(ADMIN_TOKEN_KEY);
     setIsAdmin(false);
   };
 
