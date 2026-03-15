@@ -11,6 +11,7 @@ module.exports = {
     ],
   },
   moduleNameMapper: {
+    "^@/generated/prisma/client$": "<rootDir>/lib/shims/generated-prisma-client.ts",
     "^@/(.*)$": "<rootDir>/$1",
   },
   testMatch: ["<rootDir>/__tests__/**/*.test.ts"],
